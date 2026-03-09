@@ -1,0 +1,181 @@
+// battery is the package to deal with battery info.
+package battery
+
+import (
+	"bufio"
+	"fmt"
+	"log/slog"
+	"os"
+	"path"
+	"strconv"
+	"strings"
+)
+
+const (
+	keyDevType          = "DEVTYPE"           // Unused
+	keyType             = "POWER_SUPPLY_TYPE" // Unused
+	keyName             = "POWER_SUPPLY_NAME"
+	keyStatus           = "POWER_SUPPLY_STATUS"
+	keyPresent          = "POWER_SUPPLY_PRESENT"
+	keyTechnology       = "POWER_SUPPLY_TECHNOLOGY"
+	keyCycleCount       = "POWER_SUPPLY_CYCLE_COUNT"
+	keyVoltageMinDesign = "POWER_SUPPLY_VOLTAGE_MIN_DESIGN"
+	keyVoltageNow       = "POWER_SUPPLY_VOLTAGE_NOW"
+	keyPowerNow         = "POWER_SUPPLY_POWER_NOW"
+	keyEnergyFullDesign = "POWER_SUPPLY_ENERGY_FULL_DESIGN"
+	keyEnergyFull       = "POWER_SUPPLY_ENERGY_FULL"
+	keyEnergyNow        = "POWER_SUPPLY_ENERGY_NOW"
+	keyCapacity         = "POWER_SUPPLY_CAPACITY"
+	keyCapacityLevel    = "POWER_SUPPLY_CAPACITY_LEVEL"
+	keyModelName        = "POWER_SUPPLY_MODEL_NAME"
+	keyManufacturer     = "POWER_SUPPLY_MANUFACTURER"
+	keySerialNumber     = "POWER_SUPPLY_SERIAL_NUMBER"
+)
+
+const (
+	batteryStatsFilename = "uevent"
+)
+
+const (
+	statusCharging    = "Charging"
+	statusDischarging = "Discharging"
+	statusNotCharging = "Not charging"
+)
+
+// Battery represents a crucial battery params.
+type Battery struct {
+	Path             string // Path to the battery directory
+	Name             string // Battery name
+	ModelName        string // Battery model
+	Manufacturer     string // Battery vendor
+	Technology       string // Battery technology
+	SerialNumber     string // Battery serial
+	Status           string // Charging/Not charging/Discharging
+	CapacityLevel    string // Normal/Low
+	Capacity         int    // 0-100
+	VoltageMinDesign int64  //
+	VoltageNow       int64  //
+	EnergyNow        int64  // microwatt-hours
+	EnergyFull       int64  // microwatt-hours
+	EnergyFullDesign int64  // microwatt-hours
+	PowerNow         int64  // microwatt
+	CycleCount       int    // number of full charge-discharge cycles
+	Present          bool   // If the battery attached right now
+}
+
+// New creates a new battery
+func New(path string) *Battery {
+	return &Battery{Path: path}
+}
+
+// Load loads the battery info from the uevent file.
+func (b *Battery) Load() error {
+	setters := map[string]func(string) error{
+		keyType:             func(v string) error { /* unused */ return nil },
+		keyDevType:          func(v string) error { /* unused */ return nil },
+		keyName:             func(v string) error { b.Name = v; return nil },
+		keyStatus:           func(v string) error { b.Status = v; return nil },
+		keyPresent:          func(v string) error { b.Present = v == "1"; return nil },
+		keyTechnology:       func(v string) error { b.Technology = v; return nil },
+		keyCycleCount:       func(v string) error { return parseInt(v, &b.CycleCount) },
+		keyVoltageMinDesign: func(v string) error { return parseInt64(v, &b.VoltageMinDesign) },
+		keyVoltageNow:       func(v string) error { return parseInt64(v, &b.VoltageNow) },
+		keyPowerNow:         func(v string) error { return parseInt64(v, &b.PowerNow) },
+		keyEnergyFullDesign: func(v string) error { return parseInt64(v, &b.EnergyFullDesign) },
+		keyEnergyFull:       func(v string) error { return parseInt64(v, &b.EnergyFull) },
+		keyEnergyNow:        func(v string) error { return parseInt64(v, &b.EnergyNow) },
+		keyCapacity:         func(v string) error { return parseInt(v, &b.Capacity) },
+		keyCapacityLevel:    func(v string) error { b.CapacityLevel = v; return nil },
+		keyModelName:        func(v string) error { b.ModelName = v; return nil },
+		keyManufacturer:     func(v string) error { b.Manufacturer = v; return nil },
+		keySerialNumber:     func(v string) error { b.SerialNumber = v; return nil },
+	}
+
+	fullStatPath := path.Join(b.Path, batteryStatsFilename)
+	sysfs := os.DirFS(b.Path)
+	batteryStatsFile, err := sysfs.Open(batteryStatsFilename)
+	if err != nil {
+		return fmt.Errorf("failed to open battery stats file at %s: %w", fullStatPath, err)
+	}
+	defer batteryStatsFile.Close()
+
+	scanner := bufio.NewScanner(batteryStatsFile)
+	for scanner.Scan() {
+		line := scanner.Text()
+		split := strings.Split(line, "=")
+		var rawValue string
+		if len(split) < 2 {
+			slog.Debug("Line does not match key=value format", "line", line)
+			continue
+		} else if len(split) > 2 {
+			// Could happen in cases when value contains '='
+			rawValue = strings.Join(split[1:], "=")
+		} else {
+			rawValue = split[1]
+		}
+
+		parser, ok := setters[split[0]]
+		if !ok {
+			slog.Debug("Unknown attribute in battery stats", "raw", line)
+			continue
+		}
+		if err := parser(rawValue); err != nil {
+			slog.Error("Battery attribute has invalid value", "raw", line)
+		}
+	}
+	return nil
+}
+
+// Calculate battery health in percent.
+func (b *Battery) Health() (int, error) {
+	if b.EnergyFull != 0 && b.EnergyFullDesign != 0 {
+		return int(100 * b.EnergyFull / b.EnergyFullDesign), nil
+	}
+	return 0, fmt.Errorf("not enough data to proceed")
+}
+
+// ExtendedStatus returns a battery status augmented with the time to charge or discharge.
+func (b *Battery) ExtendedStatus() string {
+	extendedStatus := b.Status
+	switch {
+	case b.Status == statusCharging && b.PowerNow != 0:
+		timeToFull := float64(3600*(b.EnergyFull-b.EnergyNow)) / float64(b.PowerNow)
+		extendedStatus = fmt.Sprintf("full in %s", formatDuration(timeToFull))
+	case b.Status == statusDischarging && b.PowerNow != 0:
+		timeToEmpty := float64(3600*b.EnergyNow) / float64(b.PowerNow)
+		extendedStatus = fmt.Sprintf("empty in %s", formatDuration(timeToEmpty))
+	case b.Status == statusNotCharging || b.Status == statusCharging || b.Status == statusDischarging:
+		return b.Status
+	default:
+		slog.Warn("Unknown status detected", "battery", b.Name, "status", b.Status)
+	}
+	return extendedStatus
+}
+
+// Universal helper for integers
+func parseInt(raw string, target *int) error {
+	val, err := strconv.Atoi(raw)
+	if err != nil {
+		return err
+	}
+	*target = val // Update the actual struct field
+	return nil
+}
+
+// Universal helper for int64 (microunits)
+func parseInt64(raw string, target *int64) error {
+	val, err := strconv.ParseInt(raw, 10, 64)
+	if err != nil {
+		return err
+	}
+	*target = val
+	return nil
+}
+
+// Helper to format seconds to the human readable format.
+func formatDuration(seconds float64) string {
+	hours := int64(seconds / 3600)
+	minutes := (int64(seconds) % 3600) / 60
+
+	return fmt.Sprintf("%dh %02dm", hours, minutes)
+}
