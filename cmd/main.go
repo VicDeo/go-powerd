@@ -41,6 +41,8 @@ func onReady() {
 
 	ctx, cancel := context.WithCancel(context.Background())
 
+	var lastCapacity int = -1
+	var lastIsCharging bool = false
 	updateUI := func() {
 		err := batteries.Load()
 		if err != nil {
@@ -49,7 +51,12 @@ func onReady() {
 		}
 		systray.SetTitle(batteries.Tooltip())
 		var buf bytes.Buffer
-		systray.SetIcon(icon.DrawIcon(batteries.Capacity(), batteries.IsCharging(), 32.0, &buf))
+		cap, charging := batteries.Capacity(), batteries.IsCharging()
+		if lastCapacity != cap || lastIsCharging != charging {
+			lastCapacity = cap
+			lastIsCharging = charging
+			systray.SetIcon(icon.DrawIcon(cap, charging, 32.0, &buf))
+		}
 	}
 
 	updateUI()
