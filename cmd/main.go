@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"flag"
 	"fmt"
@@ -47,7 +48,8 @@ func onReady() {
 			return
 		}
 		systray.SetTitle(batteries.Tooltip())
-		systray.SetIcon(icon.DrawIcon(batteries.Capacity(), batteries.IsCharging(), 32.0))
+		var buf bytes.Buffer
+		systray.SetIcon(icon.DrawIcon(batteries.Capacity(), batteries.IsCharging(), 32.0, &buf))
 	}
 
 	updateUI()

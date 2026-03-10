@@ -8,7 +8,12 @@ import (
 )
 
 // DrawIcon draws an icon of a battery with the current level and charger status next to it.
-func DrawIcon(percent int, charging bool, size float64) []byte {
+func DrawIcon(percent int, charging bool, size float64, buf *bytes.Buffer) []byte {
+	if buf == nil {
+		buf = &bytes.Buffer{}
+	}
+	buf.Reset()
+
 	dc := gg.NewContext(int(size), int(size))
 
 	// Battery Icon (Left side)
@@ -52,8 +57,7 @@ func DrawIcon(percent int, charging bool, size float64) []byte {
 		drawChargingPlus(dc, xStart+batW-size*0.3, yStart+batH*0., size*0.3)
 	} */
 
-	var buf bytes.Buffer
-	dc.EncodePNG(&buf)
+	dc.EncodePNG(buf)
 	return buf.Bytes()
 }
 
