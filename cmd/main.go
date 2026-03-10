@@ -38,11 +38,6 @@ func onReady() {
 		os.Exit(1)
 	}
 
-	systray.SetTitle("")
-	systray.SetTitle(batteries.Tooltip())
-	trayIcon := icon.DrawIcon(batteries.Capacity(), batteries.IsCharging(), 32.0)
-	systray.SetIcon(trayIcon)
-
 	ctx, cancel := context.WithCancel(context.Background())
 
 	updateUI := func() {
@@ -55,10 +50,10 @@ func onReady() {
 		systray.SetIcon(icon.DrawIcon(batteries.Capacity(), batteries.IsCharging(), 32.0))
 	}
 
+	updateUI()
+
 	deb := debounce.New(debounceWindow, updateUI)
 	defer deb.Stop()
-
-	updateUI()
 
 	onPowerEvent := func([]byte) {
 		deb.Trigger()
