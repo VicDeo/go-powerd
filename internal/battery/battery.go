@@ -33,12 +33,16 @@ const (
 )
 
 const (
+	// batteryStatsFilename is the name of the file that contains the battery statistics.
 	batteryStatsFilename = "uevent"
 )
 
 const (
-	statusCharging    = "Charging"
+	// statusCharging is the status of the battery when it is charging.
+	statusCharging = "Charging"
+	// statusDischarging is the status of the battery when it is discharging.
 	statusDischarging = "Discharging"
+	// statusNotCharging is the status of the battery when it is not charging.
 	statusNotCharging = "Not charging"
 )
 
@@ -53,17 +57,17 @@ type Battery struct {
 	Status           string // Charging/Not charging/Discharging
 	CapacityLevel    string // Normal/Low
 	Capacity         int    // 0-100
-	VoltageMinDesign int64  //
-	VoltageNow       int64  //
+	VoltageMinDesign int64  // microvolts
+	VoltageNow       int64  // microvolts
 	EnergyNow        int64  // microwatt-hours
 	EnergyFull       int64  // microwatt-hours
 	EnergyFullDesign int64  // microwatt-hours
-	PowerNow         int64  // microwatt
+	PowerNow         int64  // microwatts
 	CycleCount       int    // number of full charge-discharge cycles
 	Present          bool   // If the battery attached right now
 }
 
-// New creates a new battery
+// New creates a new battery.
 func New(path string) *Battery {
 	return &Battery{Path: path}
 }
@@ -126,7 +130,7 @@ func (b *Battery) Load() error {
 	return nil
 }
 
-// Calculate battery health in percent.
+// Health returns the battery health in percent.
 func (b *Battery) Health() (int, error) {
 	if b.EnergyFull != 0 && b.EnergyFullDesign != 0 {
 		return int(100 * b.EnergyFull / b.EnergyFullDesign), nil
@@ -152,7 +156,7 @@ func (b *Battery) ExtendedStatus() string {
 	return extendedStatus
 }
 
-// Universal helper for integers
+// parseInt is a universal helper for integers.
 func parseInt(raw string, target *int) error {
 	val, err := strconv.Atoi(raw)
 	if err != nil {
@@ -162,7 +166,7 @@ func parseInt(raw string, target *int) error {
 	return nil
 }
 
-// Universal helper for int64 (microunits)
+// parseInt64 is a universal helper for int64 (microunits).
 func parseInt64(raw string, target *int64) error {
 	val, err := strconv.ParseInt(raw, 10, 64)
 	if err != nil {
@@ -172,7 +176,7 @@ func parseInt64(raw string, target *int64) error {
 	return nil
 }
 
-// Helper to format seconds to the human readable format.
+// formatDuration is a helper to format seconds to the human readable format.
 func formatDuration(seconds float64) string {
 	hours := int64(seconds / 3600)
 	minutes := (int64(seconds) % 3600) / 60

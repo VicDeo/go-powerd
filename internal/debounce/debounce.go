@@ -1,3 +1,4 @@
+// debounce package provides a generic debouncer with a configurable interval and a callback.
 package debounce
 
 import (
@@ -30,6 +31,7 @@ func (d *Debouncer) Trigger() {
 	d.timer = time.AfterFunc(d.interval, d.run)
 }
 
+// run is a helper to run the debounced callback.
 func (d *Debouncer) run() {
 	d.mu.Lock()
 	d.timer = nil

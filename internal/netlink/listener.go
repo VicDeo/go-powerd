@@ -1,4 +1,4 @@
-// netlink package listens kernel events, filters power events and reports them back.
+// netlink package listens to kernel events, filters power events and reports them back.
 package netlink
 
 import (

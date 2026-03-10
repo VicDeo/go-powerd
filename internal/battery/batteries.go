@@ -20,7 +20,7 @@ var (
 	batteryType []byte = []byte("Battery\n")
 )
 
-// Batteries is a collection of all available batteries on the system
+// Batteries is a collection of all available batteries on the system.
 type Batteries struct {
 	root      string    // Path to a batteries root directory.
 	batteries []Battery // Slice of all discovered batteries.
@@ -63,7 +63,7 @@ func (b *Batteries) Enum() ([]string, error) {
 	return batteryNames, nil
 }
 
-// Load adds battery data for all batteries found in the system
+// Load adds battery data for all batteries found in the system.
 func (b *Batteries) Load() error {
 	b.batteries = b.batteries[:0]
 	batteryNames, err := b.Enum()
@@ -118,7 +118,7 @@ func (b *Batteries) Tooltip() string {
 	return builder.String()
 }
 
-// Capacity returns a common capacity for all system capacity.
+// Capacity returns a common capacity for all batteries.
 func (b *Batteries) Capacity() int {
 	if len(b.batteries) == 0 {
 		return 0
@@ -138,6 +138,7 @@ func (b *Batteries) Capacity() int {
 	return int(capacity)
 }
 
+// IsCharging returns true if any battery is charging.
 func (b *Batteries) IsCharging() bool {
 	for _, bat := range b.batteries {
 		if bat.Status == statusCharging {

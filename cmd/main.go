@@ -1,3 +1,4 @@
+// Main package for the go-powerd app.
 package main
 
 import (
@@ -17,9 +18,14 @@ import (
 )
 
 const (
-	sysfsPath      = "/sys/class/power_supply"
-	pollInterval   = 60 * time.Second
+	// sysfs path to the battery information
+	sysfsPath = "/sys/class/power_supply"
+	// poll interval for the battery information
+	pollInterval = 60 * time.Second
+	// debounce window for the battery information
 	debounceWindow = 500 * time.Millisecond
+	// tray icon size in pixels
+	iconSize = 32.0
 )
 
 func main() {
@@ -43,6 +49,7 @@ func onReady() {
 
 	var lastCapacity int = -1
 	var lastIsCharging bool = false
+	var buf bytes.Buffer
 	updateUI := func() {
 		err := batteries.Load()
 		if err != nil {
@@ -50,12 +57,11 @@ func onReady() {
 			return
 		}
 		systray.SetTitle(batteries.Tooltip())
-		var buf bytes.Buffer
 		cap, charging := batteries.Capacity(), batteries.IsCharging()
 		if lastCapacity != cap || lastIsCharging != charging {
 			lastCapacity = cap
 			lastIsCharging = charging
-			systray.SetIcon(icon.DrawIcon(cap, charging, 32.0, &buf))
+			systray.SetIcon(icon.DrawIcon(cap, charging, iconSize, &buf))
 		}
 	}
 
