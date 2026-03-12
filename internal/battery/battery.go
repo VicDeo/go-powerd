@@ -38,6 +38,8 @@ const (
 )
 
 const (
+	// statusFull is the status of the battery when it is full.
+	statusFull = "Full"
 	// statusCharging is the status of the battery when it is charging.
 	statusCharging = "Charging"
 	// statusDischarging is the status of the battery when it is discharging.
@@ -147,7 +149,10 @@ func (b *Battery) ExtendedStatus() string {
 	case b.Status == statusDischarging && b.PowerNow != 0:
 		timeToEmpty := float64(3600*b.EnergyNow) / float64(b.PowerNow)
 		extendedStatus = fmt.Sprintf("empty in %s", formatDuration(timeToEmpty))
-	case b.Status == statusNotCharging || b.Status == statusCharging || b.Status == statusDischarging:
+	case b.Status == statusFull ||
+		b.Status == statusNotCharging ||
+		b.Status == statusCharging ||
+		b.Status == statusDischarging:
 		return b.Status
 	default:
 		slog.Warn("Unknown status detected", "battery", b.Name, "status", b.Status)
