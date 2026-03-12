@@ -12,6 +12,13 @@ import (
 // KOBJECT_UEVENT_GROUP is the bitmask for listening to kernel uevents.
 const KOBJECT_UEVENT_GROUP = 1
 
+var (
+	powerEventFilters = [...][]byte{
+		[]byte("SUBSYSTEM=power_supply"),
+		[]byte("ACTION=change"),
+	}
+)
+
 // Listen subscribes to the kernel events and executes a callback on all power events.
 func Listen(ctx context.Context, onEvent func(data []byte)) error {
 	fd, err := unix.Socket(
@@ -86,7 +93,7 @@ func Listen(ctx context.Context, onEvent func(data []byte)) error {
 				if err != nil {
 					continue
 				}
-				if isPowerEvent(buf) {
+				if isPowerEvent(buf[:nread]) {
 					onEvent(buf[:nread])
 				}
 			case r:
@@ -99,12 +106,7 @@ func Listen(ctx context.Context, onEvent func(data []byte)) error {
 
 // isPowerEvent reports if the kernel event is a power event.
 func isPowerEvent(event []byte) bool {
-	filters := [...][]byte{
-		[]byte("SUBSYSTEM=power_supply"),
-		[]byte("ACTION=change"),
-	}
-
-	for _, filter := range filters {
+	for _, filter := range powerEventFilters {
 		if !bytes.Contains(event, filter) {
 			return false
 		}

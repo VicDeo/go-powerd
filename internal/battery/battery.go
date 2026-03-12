@@ -95,11 +95,10 @@ func (b *Battery) Load() error {
 		keySerialNumber:     func(v string) error { b.SerialNumber = v; return nil },
 	}
 
-	fullStatPath := path.Join(b.Path, batteryStatsFilename)
 	sysfs := os.DirFS(b.Path)
 	batteryStatsFile, err := sysfs.Open(batteryStatsFilename)
 	if err != nil {
-		return fmt.Errorf("failed to open battery stats file at %s: %w", fullStatPath, err)
+		return fmt.Errorf("failed to open battery stats file at %s: %w", path.Join(b.Path, batteryStatsFilename), err)
 	}
 	defer batteryStatsFile.Close()
 
