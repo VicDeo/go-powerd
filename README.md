@@ -5,7 +5,7 @@ Linux system tray battery monitor. Reads battery status from sysfs and listens t
 ## Build
 
 ```bash
-go build -o go-powerd ./cmd
+go build -o go-powerd ./cmd/go-powerd
 ```
 
 ## Usage

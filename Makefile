@@ -8,7 +8,7 @@ test:
 	go test ./...
 
 build: test
-	go build -o $(BINARY_NAME) ./cmd
+	go build -o $(BINARY_NAME) ./cmd/go-powerd
 
 install: build
 	@echo "Installing to $(INSTALL_PATH)..."
