@@ -27,13 +27,15 @@ const (
 
 // App is the main application struct.
 type App struct {
+	version   string
 	batteries *battery.Batteries
 }
 
 // New creates a new App instance.
-func New() *App {
+func New(version string) *App {
 	return &App{
 		batteries: battery.NewBatteries(sysfsPath),
+		version:   version,
 	}
 }
 
@@ -46,6 +48,14 @@ func (a *App) Run() error {
 
 	systray.Run(a.onReady, a.onExit)
 	return nil
+}
+
+func (a *App) Status() (string, error) {
+	err := a.batteries.Load()
+	if err != nil {
+		return "", fmt.Errorf("error initializing batteries info: %w", err)
+	}
+	return a.batteries.Tooltip(a.version), nil
 }
 
 // onReady is the callback function for the systray.
@@ -61,7 +71,7 @@ func (a *App) onReady() {
 			slog.Error("Error reading batteries info", "error", err)
 			return
 		}
-		systray.SetTitle(a.batteries.Tooltip())
+		systray.SetTitle(a.batteries.Tooltip(a.version))
 		cap, charging := a.batteries.Capacity(), a.batteries.IsCharging()
 		if lastCapacity != cap || lastIsCharging != charging {
 			lastCapacity = cap

@@ -10,15 +10,29 @@ go build -o go-powerd ./cmd/go-powerd
 
 ## Usage
 
+Default mode prints battery status to stdout and exits. Use **`-t`** to run in the system tray.
+
 ```bash
-# Run (starts in system tray)
+# Print status once (default)
 ./go-powerd
 
-# Run with verbose/debug logging
-./go-powerd -v
+# System tray
+./go-powerd -t
 ```
 
-Right-click the tray icon for the Quit option. Hover to see capacity, health, and charge/discharge time for each battery.
+### CLI options
+
+| Option | Description |
+|--------|-------------|
+| `-v` | Verbose logging: debug level and source locations in log lines. |
+| `-t` | Attach to the system tray instead of printing status and exiting. |
+| `-h` | Print help and exit. |
+
+```bash
+./go-powerd -h
+```
+
+With **`-t`**, right-click the tray icon for Quit. Hover the icon for capacity, health, and charge/discharge time per battery.
 
 ## License
 

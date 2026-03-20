@@ -101,9 +101,9 @@ func (b *Batteries) isBattery(base fs.FS, rel string) ([]byte, error) {
 }
 
 // Tooltip returns a full description for all installed batteries.
-func (b *Batteries) Tooltip() string {
+func (b *Batteries) Tooltip(version string) string {
 	builder := strings.Builder{}
-	builder.WriteString("go-powerd\n")
+	builder.WriteString("go-powerd v" + version + "\n")
 	for _, bat := range b.batteries {
 		health, err := bat.Health()
 		if err != nil {
