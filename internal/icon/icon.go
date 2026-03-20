@@ -1,4 +1,4 @@
-// icons package draws a tray icon.
+// icon package draws a tray icon.
 package icon
 
 import (
