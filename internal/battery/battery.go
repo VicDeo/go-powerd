@@ -128,6 +128,9 @@ func (b *Battery) Load() error {
 			slog.Error("Battery attribute has invalid value", "raw", line)
 		}
 	}
+	if err := scanner.Err(); err != nil {
+		return fmt.Errorf("error reading battery stats from %s: %w", path.Join(b.Path, batteryStatsFilename), err)
+	}
 	return nil
 }
 
