@@ -107,25 +107,19 @@ func (b *Battery) Load() error {
 	scanner := bufio.NewScanner(batteryStatsFile)
 	for scanner.Scan() {
 		line := scanner.Text()
-		split := strings.Split(line, "=")
-		var rawValue string
-		if len(split) < 2 {
+		key, rawValue, ok := strings.Cut(line, "=")
+		if !ok {
 			slog.Debug("Line does not match key=value format", "line", line)
 			continue
-		} else if len(split) > 2 {
-			// Could happen in cases when value contains '='
-			rawValue = strings.Join(split[1:], "=")
-		} else {
-			rawValue = split[1]
 		}
 
-		parser, ok := setters[split[0]]
+		parser, ok := setters[key]
 		if !ok {
-			slog.Debug("Unknown attribute in battery stats", "raw", line)
+			slog.Debug("Unknown attribute in battery stats", "line", line)
 			continue
 		}
 		if err := parser(rawValue); err != nil {
-			slog.Error("Battery attribute has invalid value", "raw", line)
+			slog.Error("Battery attribute has invalid value", "line", line, "error", err)
 		}
 	}
 	if err := scanner.Err(); err != nil {

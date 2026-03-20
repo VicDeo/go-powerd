@@ -9,17 +9,24 @@ import (
 	"github.com/VicDeo/go-powerd/internal/app"
 )
 
+const (
+	version = "0.1.0"
+)
+
 func main() {
 	var verbose bool
 	flag.BoolVar(&verbose, "v", false, "enable verbose/debug logging")
 	flag.Parse()
 
 	setupLogger(verbose)
+	slog.Info("Starting go-powerd", "version", version, "verbose", verbose)
 
 	if err := app.New().Run(); err != nil {
-		slog.Error("Error initializing batteries info", "error", err)
+		slog.Error("Error starting the application", "error", err)
+		slog.Info("Shutting down go-powerd", "version", version)
 		os.Exit(1)
 	}
+	slog.Info("Shutting down go-powerd", "version", version)
 }
 
 func setupLogger(verbose bool) {

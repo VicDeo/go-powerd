@@ -50,7 +50,7 @@ func (b *Batteries) Enum() ([]string, error) {
 		deviceType, err := b.isBattery(sysfs, deviceTypePath)
 		if err != nil {
 			// Just skip the device we can't read
-			slog.Warn("Error while reading the device type:", "deviceTypePath", deviceTypePath, "error", err)
+			slog.Warn("Error while reading the device type", "deviceTypePath", deviceTypePath, "error", err)
 			continue
 		}
 
@@ -107,7 +107,7 @@ func (b *Batteries) Tooltip() string {
 	for _, bat := range b.batteries {
 		health, err := bat.Health()
 		if err != nil {
-			slog.Warn("error while getting battery health", "error", err)
+			slog.Warn("Error while getting battery health", "error", err)
 			fmt.Fprintf(&builder,
 				"\n%s [%s]\nPower: %d%%\nHealth: Unknown\n", bat.Name, bat.ExtendedStatus(), bat.Capacity)
 		} else {
@@ -130,7 +130,7 @@ func (b *Batteries) Capacity() int {
 	}
 
 	if totalEnergyFull == 0 {
-		slog.Error("totalEnergyFull can not be zero")
+		slog.Error("No energy full capacity available for aggregate", "totalEnergyFull", totalEnergyFull, "batteriesCount", len(b.batteries))
 		return 0
 	}
 

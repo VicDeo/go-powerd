@@ -2,7 +2,6 @@
 package app
 
 import (
-	"bytes"
 	"context"
 	"fmt"
 	"log/slog"
@@ -55,7 +54,7 @@ func (a *App) onReady() {
 
 	var lastCapacity int = -1
 	var lastIsCharging bool = false
-	var buf bytes.Buffer
+	trayIcon := icon.New(iconSize)
 	updateUI := func() {
 		err := a.batteries.Load()
 		if err != nil {
@@ -67,7 +66,7 @@ func (a *App) onReady() {
 		if lastCapacity != cap || lastIsCharging != charging {
 			lastCapacity = cap
 			lastIsCharging = charging
-			systray.SetIcon(icon.DrawIcon(cap, charging, iconSize, &buf))
+			systray.SetIcon(trayIcon.PNG(cap, charging))
 		}
 	}
 
@@ -109,5 +108,5 @@ func (a *App) onReady() {
 }
 
 func (a *App) onExit() {
-	slog.Info("Quitting application...")
+	// Nothing to do here
 }
