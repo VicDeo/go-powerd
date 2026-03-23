@@ -8,9 +8,11 @@ import (
 	"time"
 
 	"github.com/VicDeo/go-powerd/internal/battery"
+	"github.com/VicDeo/go-powerd/internal/dbus"
 	"github.com/VicDeo/go-powerd/internal/debounce"
 	"github.com/VicDeo/go-powerd/internal/icon"
 	"github.com/VicDeo/go-powerd/internal/netlink"
+	"github.com/VicDeo/go-powerd/internal/policy"
 	"github.com/energye/systray"
 )
 
@@ -62,6 +64,41 @@ func (a *App) Status() (string, error) {
 func (a *App) onReady() {
 	ctx, cancel := context.WithCancel(context.Background())
 
+	discharging := &policy.Manager{
+		Name: "On Battery",
+		Policies: []*policy.Policy{
+			{
+				Name:       "Low",
+				Threshold:  20,
+				Hysteresis: 5,
+				OnTrigger: func() {
+					err := dbus.SendNotification("Low Battery!", "Connect a power source as soon as possible.", "battery-caution", true)
+					if err != nil {
+						slog.Error("Error sending notification", "error", err)
+					}
+				},
+			},
+			{
+				Name:       "Critical",
+				Threshold:  15,
+				Hysteresis: 5,
+				OnTrigger: func() {
+					err := dbus.SuspendSystem()
+					if err != nil {
+						slog.Error("Error suspending system", "error", err)
+					}
+				},
+			},
+		},
+	}
+
+	coordinator := &policy.Coordinator{
+		ChargingMngr:    &policy.Manager{Name: "Charging"},
+		DischargingMngr: discharging,
+		ActiveMngr:      nil,
+		LastStatus:      "",
+	}
+
 	var lastCapacity int = -1
 	var lastIsCharging bool = false
 	trayIcon := icon.New(iconSize)
@@ -74,6 +111,7 @@ func (a *App) onReady() {
 		systray.SetTitle(a.batteries.Tooltip(a.version))
 		cap, charging := a.batteries.Capacity(), a.batteries.IsCharging()
 		if lastCapacity != cap || lastIsCharging != charging {
+			coordinator.HandleUpdate(cap, a.batteries.Status())
 			lastCapacity = cap
 			lastIsCharging = charging
 			systray.SetIcon(trayIcon.PNG(cap, charging))
