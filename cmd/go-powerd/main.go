@@ -8,6 +8,7 @@ import (
 	"os"
 
 	"github.com/VicDeo/go-powerd/internal/app"
+	"github.com/VicDeo/go-powerd/internal/config"
 )
 
 const (
@@ -15,7 +16,9 @@ const (
 )
 
 func main() {
+	var configPath string
 	var verbose, tray, showHelp bool
+	flag.StringVar(&configPath, "c", "", "path to config file")
 	flag.BoolVar(&verbose, "v", false, "enable verbose/debug logging")
 	flag.BoolVar(&tray, "t", false, "attach to tray")
 	flag.BoolVar(&showHelp, "h", false, "show this help message and exit")
@@ -29,7 +32,22 @@ func main() {
 
 	setupLogger(verbose)
 
-	a := app.New(version)
+	if configPath == "" {
+		var err error
+		configPath, err = config.DefaultPath()
+		if err != nil {
+			slog.Error("Error while getting default config path", "error", err)
+			os.Exit(1)
+		}
+	}
+
+	cfg, err := config.Load(configPath)
+	if err != nil {
+		slog.Error("Error loading config", "error", err)
+		os.Exit(1)
+	}
+
+	a := app.New(version, cfg)
 	if tray {
 		slog.Info("Starting go-powerd", "version", version, "verbose", verbose)
 		if err := a.Run(); err != nil {
@@ -66,7 +84,8 @@ func help() {
 	fmt.Println("With -t, runs in the system tray.")
 	fmt.Println()
 	fmt.Println("Options:")
-	fmt.Println("  -v    Verbose/debug logging (with source locations)")
-	fmt.Println("  -t    Attach to system tray instead of one-shot status")
-	fmt.Println("  -h    Show this help and exit")
+	fmt.Println("  -c path    Path to config file (default: $XDG_CONFIG_HOME/go-powerd/config.toml or ~/.config/go-powerd/config.toml)")
+	fmt.Println("  -v         Verbose/debug logging (with source locations)")
+	fmt.Println("  -t         Attach to system tray instead of one-shot status")
+	fmt.Println("  -h         Show this help and exit")
 }

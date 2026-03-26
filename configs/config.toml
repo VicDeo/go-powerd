@@ -1,0 +1,22 @@
+# Example config. Install as ~/.config/go-powerd/config.toml or use --config.
+
+ConfigVersion = 1
+
+# Policies fired while discharging only, basing on aggregate capacity 0–100%):
+#   threshold — fire when capacity is at or below this value.
+#   hysteresis — after a fire, reset only when capacity rises to threshold + hysteresis (reduces flicker).
+
+[policies.notify]
+# Desktop notification (low battery).
+# Use a higher threshold than suspend so warning comes first.
+active = true
+threshold = 20
+hysteresis = 3
+
+
+[policies.suspend]
+# Suspend via logind. 
+# Keep threshold below notify.threshold.
+active = true
+threshold = 15
+hysteresis = 5

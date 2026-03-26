@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/VicDeo/go-powerd/internal/battery"
+	"github.com/VicDeo/go-powerd/internal/config"
 	"github.com/VicDeo/go-powerd/internal/dbus"
 	"github.com/VicDeo/go-powerd/internal/debounce"
 	"github.com/VicDeo/go-powerd/internal/icon"
@@ -29,14 +30,17 @@ const (
 
 // App is the main application struct.
 type App struct {
-	version   string
-	batteries *battery.Batteries
+	config              *config.Config
+	batteries           *battery.Batteries
+	dischargingPolicies []*policy.Policy
+	version             string
 }
 
 // New creates a new App instance.
-func New(version string) *App {
+func New(version string, cfg *config.Config) *App {
 	return &App{
 		batteries: battery.NewBatteries(sysfsPath),
+		config:    cfg,
 		version:   version,
 	}
 }
@@ -47,6 +51,8 @@ func (a *App) Run() error {
 	if err != nil {
 		return fmt.Errorf("error initializing batteries info: %w", err)
 	}
+
+	a.parseConfig()
 
 	systray.Run(a.onReady, a.onExit)
 	return nil
@@ -65,31 +71,8 @@ func (a *App) onReady() {
 	ctx, cancel := context.WithCancel(context.Background())
 
 	discharging := &policy.Manager{
-		Name: "On Battery",
-		Policies: []*policy.Policy{
-			{
-				Name:       "Low",
-				Threshold:  20,
-				Hysteresis: 5,
-				OnTrigger: func() {
-					err := dbus.SendNotification("Low Battery!", "Connect a power source as soon as possible.", "battery-caution", true)
-					if err != nil {
-						slog.Error("Error sending notification", "error", err)
-					}
-				},
-			},
-			{
-				Name:       "Critical",
-				Threshold:  15,
-				Hysteresis: 5,
-				OnTrigger: func() {
-					err := dbus.SuspendSystem()
-					if err != nil {
-						slog.Error("Error suspending system", "error", err)
-					}
-				},
-			},
-		},
+		Name:     "On Battery",
+		Policies: a.dischargingPolicies,
 	}
 
 	coordinator := &policy.Coordinator{
@@ -157,4 +140,37 @@ func (a *App) onReady() {
 
 func (a *App) onExit() {
 	// Nothing to do here
+}
+
+func (a *App) parseConfig() {
+
+	if *a.config.Policies.Notify.Active == true {
+		lowPolicy := policy.Policy{
+			Name:       "Low",
+			Threshold:  a.config.Policies.Notify.Threshold,
+			Hysteresis: a.config.Policies.Notify.Hysteresis,
+			OnTrigger: func() {
+				err := dbus.SendNotification("Low Battery!", "Connect a power source as soon as possible.", "battery-caution", true)
+				if err != nil {
+					slog.Error("Error sending notification", "error", err)
+				}
+			},
+		}
+		a.dischargingPolicies = append(a.dischargingPolicies, &lowPolicy)
+	}
+
+	if *a.config.Policies.Suspend.Active == true {
+		criticalPolicy := policy.Policy{
+			Name:       "Critical",
+			Threshold:  a.config.Policies.Suspend.Threshold,
+			Hysteresis: a.config.Policies.Suspend.Hysteresis,
+			OnTrigger: func() {
+				err := dbus.SuspendSystem()
+				if err != nil {
+					slog.Error("Error suspending system", "error", err)
+				}
+			},
+		}
+		a.dischargingPolicies = append(a.dischargingPolicies, &criticalPolicy)
+	}
 }
