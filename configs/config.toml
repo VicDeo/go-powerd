@@ -18,5 +18,5 @@ hysteresis = 3
 # Suspend via logind. 
 # Keep threshold below notify.threshold.
 active = true
-threshold = 15
+threshold = 10
 hysteresis = 5

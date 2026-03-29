@@ -4,6 +4,7 @@ package config
 import (
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 
@@ -16,18 +17,26 @@ type Policy struct {
 	Hysteresis int
 }
 
+type Policies struct {
+	Notify  Policy
+	Suspend Policy
+}
+
 type Config struct {
 	ConfigVersion int
-	Policies      struct {
-		Notify  Policy
-		Suspend Policy
-	}
+	Policies      Policies
 }
 
 // Load loads the config from the given path.
 func Load(path string) (*Config, error) {
 	var config Config
 	_, err := toml.DecodeFile(path, &config)
+
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		slog.Info("Config file not found, using internal defaults", "path", path)
+		return DefaultConfig(), nil
+	}
+
 	if err != nil {
 		return nil, fmt.Errorf("error while decoding config file %s: %w", path, err)
 	}
@@ -72,6 +81,31 @@ func DefaultPath() (string, error) {
 		return "", fmt.Errorf("error while getting user config directory: %w", err)
 	}
 	return filepath.Join(dir, "go-powerd", "config.toml"), nil
+}
+
+// DefaultConfig returns the default config.
+func DefaultConfig() *Config {
+	return &Config{
+		ConfigVersion: 1,
+		Policies:      DefaultPolicies(),
+	}
+}
+
+// DefaultPolicies returns the default policies.
+func DefaultPolicies() Policies {
+	active := true
+	return Policies{
+		Notify: Policy{
+			Active:     &active,
+			Threshold:  20,
+			Hysteresis: 3,
+		},
+		Suspend: Policy{
+			Active:     &active,
+			Threshold:  10,
+			Hysteresis: 5,
+		},
+	}
 }
 
 func between0And100(field string, value int) error {

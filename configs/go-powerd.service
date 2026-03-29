@@ -10,7 +10,9 @@ Type=simple
 # Updated to the standard system-wide local path
 ExecStart=/usr/local/bin/go-powerd -t
 Restart=on-failure
-RestartSec=5
+RestartSec=10
+StartLimitIntervalSec=60s
+StartLimitBurst=3
 
 # Critical environment variables for D-Bus and Wayland communication
 Environment=XDG_RUNTIME_DIR=%t
