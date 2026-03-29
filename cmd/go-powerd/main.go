@@ -11,8 +11,9 @@ import (
 	"github.com/VicDeo/go-powerd/internal/config"
 )
 
-const (
-	version = "0.1.0"
+var (
+	version = "none"
+	commit  = "none"
 )
 
 func main() {
@@ -49,7 +50,7 @@ func main() {
 
 	a := app.New(version, cfg)
 	if tray {
-		slog.Info("Starting go-powerd", "version", version, "verbose", verbose)
+		slog.Info("Starting go-powerd", "version", version, "commit", commit, "verbose", verbose)
 		if err := a.Run(); err != nil {
 			slog.Error("Error starting the application", "error", err)
 			slog.Info("Shutting down go-powerd", "version", version)

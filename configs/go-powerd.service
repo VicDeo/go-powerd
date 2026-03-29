@@ -1,0 +1,39 @@
+[Unit]
+Description=go-powerd - Battery status monitor
+Documentation=https://github.com/VicDeo/go-powerd
+# Bind to the graphical session lifetime
+PartOf=graphical-session.target
+After=graphical-session.target
+
+[Service]
+Type=simple
+# Updated to the standard system-wide local path
+ExecStart=/usr/local/bin/go-powerd -t
+Restart=on-failure
+RestartSec=5
+
+# Critical environment variables for D-Bus and Wayland communication
+Environment=XDG_RUNTIME_DIR=%t
+# Note: Some setups may require importing these via 
+# 'systemctl --user import-environment' in your WM config
+Environment=WAYLAND_DISPLAY=wayland-1
+Environment=DISPLAY=:0
+
+# --- Security & Sandboxing (Hardened) ---
+NoNewPrivileges=yes
+LockPersonality=yes
+PrivateTmp=yes
+ProtectControlGroups=yes
+ProtectClock=yes
+ProtectHostname=yes
+ProtectKernelLogs=yes
+ProtectKernelModules=yes
+ProtectKernelTunables=yes
+RestrictRealtime=yes
+RestrictSUIDSGID=yes
+MemoryDenyWriteExecute=yes
+# Restrict access to /home to read-only (optional but safer)
+ProtectHome=read-only
+
+[Install]
+WantedBy=graphical-session.target
