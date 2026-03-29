@@ -23,6 +23,7 @@ func main() {
 	flag.BoolVar(&verbose, "v", false, "enable verbose/debug logging")
 	flag.BoolVar(&tray, "t", false, "attach to tray")
 	flag.BoolVar(&showHelp, "h", false, "show this help message and exit")
+	flag.BoolVar(&showHelp, "help", false, "show this help message and exit")
 	flag.Usage = help
 	flag.Parse()
 
@@ -79,14 +80,16 @@ func setupLogger(verbose bool) {
 }
 
 func help() {
-	fmt.Println("Usage: go-powerd [options]")
-	fmt.Println()
-	fmt.Println("Without -t, prints battery status to stdout and exits.")
-	fmt.Println("With -t, runs in the system tray.")
-	fmt.Println()
-	fmt.Println("Options:")
-	fmt.Println("  -c path    Path to config file (default: $XDG_CONFIG_HOME/go-powerd/config.toml or ~/.config/go-powerd/config.toml)")
-	fmt.Println("  -v         Verbose/debug logging (with source locations)")
-	fmt.Println("  -t         Attach to system tray instead of one-shot status")
-	fmt.Println("  -h         Show this help and exit")
+	fmt.Fprintf(os.Stderr, "go-powerd %s (commit: %s)\n", version, commit)
+	fmt.Fprintf(os.Stderr, "Copyright (c) 2026 Viktar Dubiniuk\n")
+	fmt.Fprintf(os.Stderr, "License: GPL-3.0-only\n\n")
+	fmt.Fprintf(os.Stderr, "A high-performance, minimalist battery monitor for Linux.\n\n")
+	fmt.Fprintf(os.Stderr, "Usage: go-powerd [options]\n\n")
+	fmt.Fprintf(os.Stderr, "Without -t, prints battery status to stdout and exits.\n")
+	fmt.Fprintf(os.Stderr, "With -t, runs in the system tray.\n\n")
+	fmt.Fprintf(os.Stderr, "Options:\n")
+	fmt.Fprintf(os.Stderr, "  -c path    Path to config file (default: $XDG_CONFIG_HOME/go-powerd/config.toml or ~/.config/go-powerd/config.toml)\n")
+	fmt.Fprintf(os.Stderr, "  -v         Verbose/debug logging (with source locations)\n")
+	fmt.Fprintf(os.Stderr, "  -t         Attach to system tray instead of one-shot status\n")
+	fmt.Fprintf(os.Stderr, "  -h         Show this help and exit\n")
 }

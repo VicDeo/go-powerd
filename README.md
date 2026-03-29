@@ -92,6 +92,16 @@ hysteresis = 5 # Only reset policy when battery reaches 15%
 
 * `internal/debounce`: Thread-safe event throttling to prevent redundant syscalls.
 
+## 👥 Authors
+
+* **VicDeo** — *Main Developer & Maintainer*
+  * [GitHub](https://github.com/VicDeo) 
+  * [LinkedIn](https://linkedin.com/in/dubiniuk)
+* *Built and tested on openSUSE Tumbleweed 🦎*
+
+---
+"Why? Because 12MB of RAM is more than enough for a battery monitor."
+
 ## 📜 License
 
 GPL-3.0. See [LICENSE](LICENSE) for details.
