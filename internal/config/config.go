@@ -30,12 +30,13 @@ type Config struct {
 // Load loads the config from the given path.
 func Load(path string) (*Config, error) {
 	var config Config
-	_, err := toml.DecodeFile(path, &config)
 
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		slog.Info("Config file not found, using internal defaults", "path", path)
 		return DefaultConfig(), nil
 	}
+
+	_, err := toml.DecodeFile(path, &config)
 
 	if err != nil {
 		return nil, fmt.Errorf("error while decoding config file %s: %w", path, err)

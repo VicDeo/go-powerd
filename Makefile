@@ -11,7 +11,7 @@ DIRTY := $(shell git diff --quiet || echo "-dirty")
 # LDFLAGS: -s -w for size, and injecting version + commit info
 LDFLAGS=-ldflags "-s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT_HASH)$(DIRTY)"
 
-.PHONY: all build install uninstall clean test check-deps help
+.PHONY: all build install uninstall clean test help
 
 all: build
 
@@ -22,21 +22,17 @@ help:
 	@echo "Targets:"
 	@sed -n 's/^##//p' ${MAKEFILE_LIST} | column -t -s ':' |  sed -e 's/^/ /'
 
-## check-deps: Check if required development libraries are installed
-check-deps:
-	@pkg-config --exists gtk+-3.0 || (echo "Error: gtk+-3.0 not found. Install libgtk-3-dev or gtk3-devel"; exit 1)
-
 ## test: Run unit tests
 test:
 	go test ./...
 
 ## build: Compile the binary
-build: check-deps test
-	go build $(LDFLAGS) -o $(BINARY_NAME) ./cmd/go-powerd
+build: test
+	CGO_ENABLED=0 go build $(LDFLAGS) -o $(BINARY_NAME) ./cmd/go-powerd
 
 ## install: Install binary to the system (requires sudo for /usr/local)
-install: build
-	sudo install -Dm755 $(BINARY_NAME) $(DESTDIR)$(BINDIR)/$(BINARY_NAME)
+install:
+	install -Dm755 $(BINARY_NAME) $(DESTDIR)$(BINDIR)/$(BINARY_NAME)
 	@echo "Installed to $(DESTDIR)$(BINDIR)/$(BINARY_NAME)"
 
 ## install-service: Setup and enable systemd user service
@@ -48,13 +44,18 @@ install-service:
 	systemctl --user enable --now $(SERVICE_NAME)
 	@echo "Service installed and started."
 
-## uninstall: Remove binary from the system
+## uninstall: Remove only the binary from the system (requires sudo)
 uninstall:
-	@echo "Removing service and binary..."
+	@echo "Removing binary from $(DESTDIR)$(BINDIR)..."
+	rm -f $(DESTDIR)$(BINDIR)/$(BINARY_NAME)
+
+## uninstall-service: Stop and remove the systemd user service (run as user)
+uninstall-service:
+	@echo "Disabling and removing user service..."
 	systemctl --user disable --now $(SERVICE_NAME) 2>/dev/null || true
 	rm -f $(HOME)/.config/systemd/user/$(SERVICE_NAME)
 	systemctl --user daemon-reload
-	sudo rm -f $(DESTDIR)$(BINDIR)/$(BINARY_NAME)
+	@echo "User service removed."
 
 ## reload: Build, install and restart (detects systemd vs standalone)
 reload: build

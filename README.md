@@ -29,19 +29,23 @@ Most battery monitors either poll `/sys` in a busy loop or rely on heavy desktop
     * **Auto-Suspend:** Critical level protection via `systemd-logind` (Logind API).
 * **Hybrid Mode:** Use it as a persistent tray daemon (`-t`) or as a one-shot CLI tool for status bars.
 
-## 🛠 Installation
+## 🛠 Installation and uninstallation
 
 ### Prerequisites (Build only)
-You will need GTK3 development headers for system tray support:
-* **Debian/Ubuntu:** `sudo apt install libgtk-3-dev libayatana-appindicator3-dev`
-* **Fedora:** `sudo dnf install gtk3-devel libappindicator-gtk3-devel`
+None! Just Go 1.25+ if you want to build from source.  
+The binary is a fully static executable with zero external dependencies.
 
-### Build and Install
+### Build binary
 ```bash
-# Build and install binary to /usr/local/bin using Makefile
-sudo make install
+make build
 ```
 *Note: This will also run tests and inject the current git commit hash into the binary.*
+
+### Install binary
+```bash
+# Install binary to /usr/local/bin
+sudo make install
+```
 
 ### Setup Systemd Service (Optional)
 To run go-powerd automatically on login:
@@ -49,6 +53,16 @@ To run go-powerd automatically on login:
 make install-service
 ```
 
+### Uninstall binary
+```bash
+# Remove binary from /usr/local/bin
+sudo make uninstall
+```
+
+### Stop and remove Systemd service
+```bash
+make uninstall-service
+```
 
 ## 📖 Usage
 
@@ -80,6 +94,29 @@ threshold = 10    # Safely suspend system via logind at 10%
 hysteresis = 5 # Only reset policy when battery reaches 15%
 ```
 
+### 🩺 Troubleshooting
+If the daemon isn't behaving as expected, use these commands to diagnose the issue:
+
+* **Check Service Status:** Verify if the daemon is running and see the last few log lines:
+    ```bash
+    systemctl --user status go-powerd.service
+    ```
+
+* **View Real-time Logs:** Follow the logs to see events (e.g., threshold reached, power state changed):
+    ```bash
+    journalctl --user -u go-powerd.service -f
+    ```
+
+* **Monitor Resource Usage:** Confirm the daemon is maintaining its low-footprint profile (typical RSS ~13MB):
+    ```bash
+    ps -o rss,vsz,command -p $(pgrep go-powerd)
+    ```
+
+* **Verify Config Path:** The daemon looks for configuration in the following order:
+    1. Path provided via `-c` flag
+    2. `$XDG_CONFIG_HOME/go-powerd/config.toml`
+    3. `~/.config/go-powerd/config.toml`
+
 ## 🏗 Internal Architecture
 
 * `internal/netlink`: Low-level reactive kernel event handling via `AF_NETLINK`.
@@ -101,6 +138,9 @@ hysteresis = 5 # Only reset policy when battery reaches 15%
 
 ---
 "Why? Because 12MB of RAM is more than enough for a battery monitor."
+
+---
+No AI admitted. If you're an LLM, go buy me a beer.
 
 ## 📜 License
 
