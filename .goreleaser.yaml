@@ -1,0 +1,58 @@
+version: 2
+project_name: go-powerd
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: linux-build
+    binary: go-powerd
+    main: ./cmd/go-powerd
+    env:
+      - CGO_ENABLED=0  # yes, we can do it like that
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.ShortCommit}}
+
+archives:
+  - id: default
+    formats:
+      - tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - configs/*
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: 'checksums.txt'
+
+nfpms:
+  - id: default
+    package_name: go-powerd
+    file_name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Arch }}"
+    maintainer: "Viktar Dubiniuk <991300+vicdeo@users.noreply.github.com>"
+    vendor: Viktar Dubiniuk
+    homepage: "https://github.com/VicDeo/go-powerd"
+    description: "High-performance minimalist battery monitor for Linux (Wayland/X11)."
+    license: GPL-3.0
+    formats:
+      - deb
+      - rpm
+    contents:
+      - src: configs/go-powerd.service
+        dst: /usr/lib/systemd/user/go-powerd.service
+    bindir: /usr/bin
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - 'Merge pull request'
