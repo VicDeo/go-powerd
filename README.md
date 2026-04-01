@@ -4,30 +4,22 @@
 [![License](https://img.shields.io/badge/License-GPL--3.0-blue.svg)](LICENSE)
 
 A high-performance, minimalist battery monitor for Linux.  
-Designed for users who value technical transparency, resource efficiency, and reliable system integration (perfect for Sway, i3, and other Wayland/X11 window managers).
+Designed for users who value technical transparency, resource efficiency, and reliable system integration (perfect for Sway, i3, and other Wayland/X11 managers).
 
-## 🚀 Why go-powerd?
+## 🚀 Key Features & Screenshots
 
-Most battery monitors either poll `/sys` in a busy loop or rely on heavy desktop-specific daemons like `UPower`.  
-**go-powerd** takes a balanced, engineering-first approach:
+| 7-Segment Tray Icon | Detailed Tooltip (ThinkPad Ready) |
+|:---:|:---:|
+| ![Main Tray Icon](.assets/battery.png) | ![Detailed Tooltip](.assets/battery-tooltip.png) |
+| *Retro aesthetics, no external icons* | *Per-battery health & status* |
 
-* **Hybrid Monitoring Engine:**
-    * **Real-time:** Uses a **Netlink** socket with **Epoll** to catch kernel `uevents` immediately (e.g., plugging in a charger).
-    * **Fail-safe:** A low-frequency **60s fallback ticker** ensures consistency and updates "time-to-empty" estimates even during periods of kernel silence.
-* **Resource-Aware UI:** The system tray icon is re-rendered **only when the numeric capacity or charging state changes**, eliminating redundant CPU/GPU cycles.
-* **Debounced Updates:** All power events are funneled through a **500ms debounce window**, preventing UI "flickering" during rapid power state transitions.
-* **Minimal Footprint:** Written in pure Go. Consumes **~10-15MB RSS**—significantly lighter than Electron, Python, or heavy C++ alternatives.
-* **Smart State Management:** Built-in **Hysteresis** logic prevents notification spamming when battery voltage fluctuates under heavy CPU load.
-* **Retro Aesthetics:** Custom-drawn **7-segment digital icons** that change color based on state (Charging, Discharging, Low).
+* **Multi-Battery Aggregation:** Automatically detects and calculates combined capacity and health (ideal for dual-battery systems).
+* **Hybrid Monitoring:** Real-time **Netlink** (uevents) + 60s fail-safe fallback ticker.
+* **Minimal Footprint:** Written in pure Go. Consumes **~12MB RSS**.
+* **Zero Dependencies:** Fully static binary (`CGO_ENABLED=0`). Runs anywhere.
+* **Smart Policies:** Built-in **Hysteresis** logic and **Debounced** UI updates.
 
-## ✨ Key Features
-
-* **Multi-Battery Aggregation:** Automatically detects and calculates combined capacity and health for systems with multiple batteries (e.g., Lenovo ThinkPads).
-* **Health Monitoring:** Tracks battery degradation by comparing `EnergyFull` vs `EnergyFullDesign`.
-* **Desktop Integration:**
-    * **Notifications:** Low/Critical alerts via native D-Bus (`org.freedesktop.Notifications`).
-    * **Auto-Suspend:** Critical level protection via `systemd-logind` (Logind API).
-* **Hybrid Mode:** Use it as a persistent tray daemon (`-t`) or as a one-shot CLI tool for status bars.
+---
 
 ## 🛠 Installation and uninstallation
 
