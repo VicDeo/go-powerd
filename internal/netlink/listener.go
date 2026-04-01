@@ -4,6 +4,7 @@ package netlink
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"sync"
 
 	"golang.org/x/sys/unix"
@@ -23,7 +24,7 @@ var (
 func Listen(ctx context.Context, onEvent func(data []byte)) error {
 	fd, err := unix.Socket(
 		unix.AF_NETLINK,
-		unix.SOCK_RAW,
+		unix.SOCK_RAW|unix.SOCK_CLOEXEC|unix.SOCK_NONBLOCK,
 		unix.NETLINK_KOBJECT_UEVENT,
 	)
 	if err != nil {
@@ -39,19 +40,25 @@ func Listen(ctx context.Context, onEvent func(data []byte)) error {
 		return err
 	}
 
+	efd, err := unix.Eventfd(0, unix.EFD_CLOEXEC|unix.EFD_NONBLOCK)
+	if err != nil {
+		return err
+	}
+	defer unix.Close(efd)
+
 	epfd, err := unix.EpollCreate1(unix.EPOLL_CLOEXEC)
 	if err != nil {
 		return err
 	}
 	defer unix.Close(epfd)
 
-	var pipeFds [2]int
-	if err := unix.Pipe(pipeFds[:]); err != nil {
+	// Register event fd for context cancellation
+	if err := unix.EpollCtl(epfd, unix.EPOLL_CTL_ADD, efd, &unix.EpollEvent{
+		Events: unix.EPOLLIN,
+		Fd:     int32(efd),
+	}); err != nil {
 		return err
 	}
-	r, w := pipeFds[0], pipeFds[1]
-	defer unix.Close(r)
-	defer unix.Close(w)
 
 	// Register netlink fd for read events
 	if err := unix.EpollCtl(epfd, unix.EPOLL_CTL_ADD, fd, &unix.EpollEvent{
@@ -60,21 +67,28 @@ func Listen(ctx context.Context, onEvent func(data []byte)) error {
 	}); err != nil {
 		return err
 	}
-	// Register pipe read end for context cancellation
-	if err := unix.EpollCtl(epfd, unix.EPOLL_CTL_ADD, r, &unix.EpollEvent{
-		Events: unix.EPOLLIN,
-		Fd:     int32(r),
-	}); err != nil {
-		return err
-	}
 
 	// When ctx is done, write to pipe to wake epoll
 	var once sync.Once
-	stop := func() { once.Do(func() { unix.Write(w, []byte{1}) }) }
-	go func() {
-		<-ctx.Done()
-		stop()
-	}()
+	stop := func() {
+		once.Do(func() {
+			var b [8]byte
+			binary.LittleEndian.PutUint64(b[:], 1)
+			unix.Write(efd, b[:])
+		})
+	}
+
+	killer := make(chan struct{})
+	defer close(killer)
+
+	go func(killer chan struct{}) {
+		select {
+		case <-killer:
+			return
+		case <-ctx.Done():
+			stop()
+		}
+	}(killer)
 
 	buf := make([]byte, 4096)
 	events := make([]unix.EpollEvent, 2)
@@ -94,10 +108,15 @@ func Listen(ctx context.Context, onEvent func(data []byte)) error {
 					continue
 				}
 				if isPowerEvent(buf[:nread]) {
-					onEvent(buf[:nread])
+					eventData := make([]byte, nread)
+					copy(eventData, buf[:nread])
+					onEvent(eventData)
 				}
-			case r:
-				// Context cancelled or pipe readable
+			case efd:
+				// Context cancelled
+				// read the data before bail out
+				var tmp [8]byte
+				unix.Read(efd, tmp[:])
 				return ctx.Err()
 			}
 		}
