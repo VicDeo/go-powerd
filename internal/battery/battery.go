@@ -2,13 +2,12 @@
 package battery
 
 import (
-	"bufio"
+	"bytes"
 	"fmt"
+	"io"
 	"log/slog"
 	"os"
 	"path"
-	"strconv"
-	"strings"
 )
 
 const (
@@ -50,6 +49,7 @@ const (
 
 // Battery represents a crucial battery params.
 type Battery struct {
+	buf              []byte
 	Path             string // Path to the battery directory
 	Name             string // Battery name
 	ModelName        string // Battery model
@@ -71,30 +71,30 @@ type Battery struct {
 
 // New creates a new battery.
 func New(path string) *Battery {
-	return &Battery{Path: path}
+	return &Battery{buf: make([]byte, 4096), Path: path}
 }
 
 // Load loads the battery info from the uevent file.
 func (b *Battery) Load() error {
-	setters := map[string]func(string) error{
-		keyType:             func(v string) error { /* unused */ return nil },
-		keyDevType:          func(v string) error { /* unused */ return nil },
-		keyName:             func(v string) error { b.Name = v; return nil },
-		keyStatus:           func(v string) error { b.Status = v; return nil },
-		keyPresent:          func(v string) error { b.Present = v == "1"; return nil },
-		keyTechnology:       func(v string) error { b.Technology = v; return nil },
-		keyCycleCount:       func(v string) error { return parseInt(v, &b.CycleCount) },
-		keyVoltageMinDesign: func(v string) error { return parseInt64(v, &b.VoltageMinDesign) },
-		keyVoltageNow:       func(v string) error { return parseInt64(v, &b.VoltageNow) },
-		keyPowerNow:         func(v string) error { return parseInt64(v, &b.PowerNow) },
-		keyEnergyFullDesign: func(v string) error { return parseInt64(v, &b.EnergyFullDesign) },
-		keyEnergyFull:       func(v string) error { return parseInt64(v, &b.EnergyFull) },
-		keyEnergyNow:        func(v string) error { return parseInt64(v, &b.EnergyNow) },
-		keyCapacity:         func(v string) error { return parseInt(v, &b.Capacity) },
-		keyCapacityLevel:    func(v string) error { b.CapacityLevel = v; return nil },
-		keyModelName:        func(v string) error { b.ModelName = v; return nil },
-		keyManufacturer:     func(v string) error { b.Manufacturer = v; return nil },
-		keySerialNumber:     func(v string) error { b.SerialNumber = v; return nil },
+	setters := map[string]func([]byte) error{
+		keyType:             func(v []byte) error { /* unused */ return nil },
+		keyDevType:          func(v []byte) error { /* unused */ return nil },
+		keyName:             func(v []byte) error { b.Name = string(v); return nil },
+		keyStatus:           func(v []byte) error { b.Status = string(v); return nil },
+		keyPresent:          func(v []byte) error { b.Present = len(v) > 0 && v[0] == '1'; return nil },
+		keyTechnology:       func(v []byte) error { b.Technology = string(v); return nil },
+		keyCycleCount:       func(v []byte) error { return parseInt(v, &b.CycleCount) },
+		keyVoltageMinDesign: func(v []byte) error { return parseInt64(v, &b.VoltageMinDesign) },
+		keyVoltageNow:       func(v []byte) error { return parseInt64(v, &b.VoltageNow) },
+		keyPowerNow:         func(v []byte) error { return parseInt64(v, &b.PowerNow) },
+		keyEnergyFullDesign: func(v []byte) error { return parseInt64(v, &b.EnergyFullDesign) },
+		keyEnergyFull:       func(v []byte) error { return parseInt64(v, &b.EnergyFull) },
+		keyEnergyNow:        func(v []byte) error { return parseInt64(v, &b.EnergyNow) },
+		keyCapacity:         func(v []byte) error { return parseInt(v, &b.Capacity) },
+		keyCapacityLevel:    func(v []byte) error { b.CapacityLevel = string(v); return nil },
+		keyModelName:        func(v []byte) error { b.ModelName = string(v); return nil },
+		keyManufacturer:     func(v []byte) error { b.Manufacturer = string(v); return nil },
+		keySerialNumber:     func(v []byte) error { b.SerialNumber = string(v); return nil },
 	}
 
 	sysfs := os.DirFS(b.Path)
@@ -104,26 +104,40 @@ func (b *Battery) Load() error {
 	}
 	defer batteryStatsFile.Close()
 
-	scanner := bufio.NewScanner(batteryStatsFile)
-	for scanner.Scan() {
-		line := scanner.Text()
-		key, rawValue, ok := strings.Cut(line, "=")
-		if !ok {
-			slog.Debug("Line does not match key=value format", "line", line)
+	n, err := batteryStatsFile.Read(b.buf)
+	if err != nil && err != io.EOF {
+		return err
+	}
+
+	remaining := b.buf[:n]
+	for len(remaining) > 0 {
+		idx := bytes.IndexByte(remaining, '\n')
+		var line []byte
+		if idx == -1 {
+			line = remaining
+			remaining = nil
+		} else {
+			line = remaining[:idx]
+			remaining = remaining[idx+1:]
+		}
+		if len(line) == 0 {
 			continue
 		}
 
-		parser, ok := setters[key]
+		key, rawValue, ok := bytes.Cut(line, []byte("="))
 		if !ok {
-			slog.Debug("Unknown attribute in battery stats", "line", line)
+			slog.Debug("Line does not match key=value format", "line", string(line))
+			continue
+		}
+
+		parser, ok := setters[string(key)]
+		if !ok {
+			slog.Debug("Unknown attribute in battery stats", "line", string(line))
 			continue
 		}
 		if err := parser(rawValue); err != nil {
-			slog.Error("Battery attribute has invalid value", "line", line, "error", err)
+			slog.Error("Battery attribute has invalid value", "line", string(line), "error", err)
 		}
-	}
-	if err := scanner.Err(); err != nil {
-		return fmt.Errorf("error reading battery stats from %s: %w", path.Join(b.Path, batteryStatsFilename), err)
 	}
 	return nil
 }
@@ -158,18 +172,18 @@ func (b *Battery) ExtendedStatus() string {
 }
 
 // parseInt is a universal helper for integers.
-func parseInt(raw string, target *int) error {
-	val, err := strconv.Atoi(raw)
+func parseInt(raw []byte, target *int) error {
+	val, err := atoi64(raw)
 	if err != nil {
 		return err
 	}
-	*target = val // Update the actual struct field
+	*target = int(val) // Update the actual struct field
 	return nil
 }
 
 // parseInt64 is a universal helper for int64 (microunits).
-func parseInt64(raw string, target *int64) error {
-	val, err := strconv.ParseInt(raw, 10, 64)
+func parseInt64(raw []byte, target *int64) error {
+	val, err := atoi64(raw)
 	if err != nil {
 		return err
 	}
@@ -183,4 +197,16 @@ func formatDuration(seconds float64) string {
 	minutes := (int64(seconds) % 3600) / 60
 
 	return fmt.Sprintf("%dh %02dm", hours, minutes)
+}
+
+func atoi64(b []byte) (int64, error) {
+	var res int64
+	for i := 0; i < len(b); i++ {
+		if b[i] >= byte('0') && b[i] <= byte('9') {
+			res = res*10 + int64(b[i]-'0')
+		} else {
+			return 0, fmt.Errorf("ascii to int conversion failed. invalid source: %s", string(b))
+		}
+	}
+	return res, nil
 }
