@@ -47,6 +47,29 @@ const (
 	statusNotCharging = "Not charging"
 )
 
+var (
+	setters = map[string]func(*Battery, []byte) error{
+		keyType:             func(b *Battery, v []byte) error { /* unused */ return nil },
+		keyDevType:          func(b *Battery, v []byte) error { /* unused */ return nil },
+		keyName:             func(b *Battery, v []byte) error { b.Name = string(v); return nil },
+		keyStatus:           func(b *Battery, v []byte) error { b.Status = string(v); return nil },
+		keyPresent:          func(b *Battery, v []byte) error { b.Present = len(v) > 0 && v[0] == '1'; return nil },
+		keyTechnology:       func(b *Battery, v []byte) error { b.Technology = string(v); return nil },
+		keyCycleCount:       func(b *Battery, v []byte) error { return parseInt(v, &b.CycleCount) },
+		keyVoltageMinDesign: func(b *Battery, v []byte) error { return parseInt64(v, &b.VoltageMinDesign) },
+		keyVoltageNow:       func(b *Battery, v []byte) error { return parseInt64(v, &b.VoltageNow) },
+		keyPowerNow:         func(b *Battery, v []byte) error { return parseInt64(v, &b.PowerNow) },
+		keyEnergyFullDesign: func(b *Battery, v []byte) error { return parseInt64(v, &b.EnergyFullDesign) },
+		keyEnergyFull:       func(b *Battery, v []byte) error { return parseInt64(v, &b.EnergyFull) },
+		keyEnergyNow:        func(b *Battery, v []byte) error { return parseInt64(v, &b.EnergyNow) },
+		keyCapacity:         func(b *Battery, v []byte) error { return parseInt(v, &b.Capacity) },
+		keyCapacityLevel:    func(b *Battery, v []byte) error { b.CapacityLevel = string(v); return nil },
+		keyModelName:        func(b *Battery, v []byte) error { b.ModelName = string(v); return nil },
+		keyManufacturer:     func(b *Battery, v []byte) error { b.Manufacturer = string(v); return nil },
+		keySerialNumber:     func(b *Battery, v []byte) error { b.SerialNumber = string(v); return nil },
+	}
+)
+
 // Battery represents a crucial battery params.
 type Battery struct {
 	buf              []byte
@@ -76,27 +99,6 @@ func New(path string) *Battery {
 
 // Load loads the battery info from the uevent file.
 func (b *Battery) Load() error {
-	setters := map[string]func([]byte) error{
-		keyType:             func(v []byte) error { /* unused */ return nil },
-		keyDevType:          func(v []byte) error { /* unused */ return nil },
-		keyName:             func(v []byte) error { b.Name = string(v); return nil },
-		keyStatus:           func(v []byte) error { b.Status = string(v); return nil },
-		keyPresent:          func(v []byte) error { b.Present = len(v) > 0 && v[0] == '1'; return nil },
-		keyTechnology:       func(v []byte) error { b.Technology = string(v); return nil },
-		keyCycleCount:       func(v []byte) error { return parseInt(v, &b.CycleCount) },
-		keyVoltageMinDesign: func(v []byte) error { return parseInt64(v, &b.VoltageMinDesign) },
-		keyVoltageNow:       func(v []byte) error { return parseInt64(v, &b.VoltageNow) },
-		keyPowerNow:         func(v []byte) error { return parseInt64(v, &b.PowerNow) },
-		keyEnergyFullDesign: func(v []byte) error { return parseInt64(v, &b.EnergyFullDesign) },
-		keyEnergyFull:       func(v []byte) error { return parseInt64(v, &b.EnergyFull) },
-		keyEnergyNow:        func(v []byte) error { return parseInt64(v, &b.EnergyNow) },
-		keyCapacity:         func(v []byte) error { return parseInt(v, &b.Capacity) },
-		keyCapacityLevel:    func(v []byte) error { b.CapacityLevel = string(v); return nil },
-		keyModelName:        func(v []byte) error { b.ModelName = string(v); return nil },
-		keyManufacturer:     func(v []byte) error { b.Manufacturer = string(v); return nil },
-		keySerialNumber:     func(v []byte) error { b.SerialNumber = string(v); return nil },
-	}
-
 	sysfs := os.DirFS(b.Path)
 	batteryStatsFile, err := sysfs.Open(batteryStatsFilename)
 	if err != nil {
@@ -135,7 +137,7 @@ func (b *Battery) Load() error {
 			slog.Debug("Unknown attribute in battery stats", "line", string(line))
 			continue
 		}
-		if err := parser(rawValue); err != nil {
+		if err := parser(b, rawValue); err != nil {
 			slog.Error("Battery attribute has invalid value", "line", string(line), "error", err)
 		}
 	}
