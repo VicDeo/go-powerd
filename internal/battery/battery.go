@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path"
+	"github.com/VicDeo/go-powerd/internal/pool"
 )
 
 const (
@@ -72,7 +73,6 @@ var (
 
 // Battery represents a crucial battery params.
 type Battery struct {
-	buf              []byte
 	Path             string // Path to the battery directory
 	Name             string // Battery name
 	ModelName        string // Battery model
@@ -94,7 +94,7 @@ type Battery struct {
 
 // New creates a new battery.
 func New(path string) *Battery {
-	return &Battery{buf: make([]byte, 4096), Path: path}
+	return &Battery{Path: path}
 }
 
 // Load loads the battery info from the uevent file.
@@ -106,12 +106,15 @@ func (b *Battery) Load() error {
 	}
 	defer batteryStatsFile.Close()
 
-	n, err := batteryStatsFile.Read(b.buf)
+	buf := pool.Get()
+	defer pool.Put(buf)
+	n, err := batteryStatsFile.Read(buf.Bytes())
 	if err != nil && err != io.EOF {
 		return err
 	}
 
-	remaining := b.buf[:n]
+	buf.SetLen(n)
+	remaining := buf.Data()
 	for len(remaining) > 0 {
 		idx := bytes.IndexByte(remaining, '\n')
 		var line []byte

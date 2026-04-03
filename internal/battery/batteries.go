@@ -8,6 +8,8 @@ import (
 	"os"
 	"path"
 	"strings"
+
+	"github.com/VicDeo/go-powerd/internal/pool"
 )
 
 const (
@@ -22,8 +24,8 @@ var (
 
 // Batteries is a collection of all available batteries on the system.
 type Batteries struct {
-	root      string    // Path to a batteries root directory.
-	batteries map[string] *Battery // All discovered batteries.
+	root      string              // Path to a batteries root directory.
+	batteries map[string]*Battery // All discovered batteries.
 }
 
 // NewBatteries return a new empty Batteries collection.
@@ -45,21 +47,23 @@ func (b *Batteries) Enum() ([]string, error) {
 		return nil, fmt.Errorf("could not read entries in %s: %w", b.root, err)
 	}
 
-	deviceType := make([]byte, len(batteryType))
+	dt := pool.Get()
+	defer pool.Put(dt)
 	for _, device := range entries {
 		deviceTypePath := path.Join(device.Name(), typeFilename)
 
-		err := b.isBattery(sysfs, deviceTypePath, deviceType)
+		err := b.deviceType(sysfs, deviceTypePath, dt)
 		if err != nil {
 			// Just skip the device we can't read
 			slog.Warn("Error while reading the device type", "deviceTypePath", deviceTypePath, "error", err)
 			continue
 		}
 
-		slog.Debug("Type file content", "deviceTypePath", deviceTypePath, "deviceType", deviceType)
-		if bytes.Equal(deviceType, batteryType) {
+		slog.Debug("Type file content", "deviceTypePath", deviceTypePath, "deviceType", dt)
+		if bytes.Equal(dt.Data(), batteryType) {
 			batteryNames = append(batteryNames, device.Name())
 		}
+		dt.Reset()
 	}
 
 	return batteryNames, nil
@@ -78,7 +82,7 @@ func (b *Batteries) Load() error {
 	for name := range b.batteries {
 		found := false
 		for _, n := range batteryNames {
-			if n ==name {
+			if n == name {
 				found = true
 				break
 			}
@@ -101,8 +105,8 @@ func (b *Batteries) Load() error {
 	return nil
 }
 
-// isBattery checks if the power device is battery by matching the file content.
-func (b *Batteries) isBattery(base fs.FS, rel string, buffer []byte) (error) {
+// deviceType checks if the power device is battery by matching the file content.
+func (b *Batteries) deviceType(base fs.FS, rel string, buf *pool.Buffer) error {
 	deviceTypeFile, err := base.Open(rel)
 	if err != nil {
 		// Having no type is not that expected but ok to continue
@@ -110,12 +114,12 @@ func (b *Batteries) isBattery(base fs.FS, rel string, buffer []byte) (error) {
 	}
 	defer deviceTypeFile.Close()
 
-	n, err := deviceTypeFile.Read(buffer)
+	n, err := deviceTypeFile.Read(buf.Bytes())
 	if err != nil {
 		// Skip unread type file
 		return fmt.Errorf("failed to read type file for the device at %s: %w", rel, err)
 	}
-	buffer = buffer[:n]
+	buf.SetLen(n)
 	return nil
 }
 

@@ -117,7 +117,7 @@ If the daemon isn't behaving as expected, use these commands to diagnose the iss
 
 * `internal/icon`: Custom PNG generation engine for the 7-segment display.
 
-* `internal/battery`: Direct `sysfs` parser using optimized `bufio` scanners.
+* `internal/battery`: Direct `sysfs` parser using manual line scan with zero memory allocation.
 
 * `internal/debounce`: Thread-safe event throttling to prevent redundant syscalls.
 
