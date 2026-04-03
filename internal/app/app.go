@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"runtime/debug"
 	"time"
 
 	"github.com/VicDeo/go-powerd/internal/battery"
@@ -98,6 +99,7 @@ func (a *App) onReady() {
 			lastCapacity = cap
 			lastIsCharging = charging
 			systray.SetIcon(trayIcon.PNG(cap, charging))
+			debug.FreeOSMemory()
 		}
 	}
 
