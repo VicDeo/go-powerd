@@ -23,7 +23,7 @@ var (
 // Batteries is a collection of all available batteries on the system.
 type Batteries struct {
 	root      string    // Path to a batteries root directory.
-	batteries []Battery // Slice of all discovered batteries.
+	batteries map[string] *Battery // All discovered batteries.
 }
 
 // NewBatteries return a new empty Batteries collection.
@@ -45,9 +45,11 @@ func (b *Batteries) Enum() ([]string, error) {
 		return nil, fmt.Errorf("could not read entries in %s: %w", b.root, err)
 	}
 
+	deviceType := make([]byte, len(batteryType))
 	for _, device := range entries {
 		deviceTypePath := path.Join(device.Name(), typeFilename)
-		deviceType, err := b.isBattery(sysfs, deviceTypePath)
+
+		err := b.isBattery(sysfs, deviceTypePath, deviceType)
 		if err != nil {
 			// Just skip the device we can't read
 			slog.Warn("Error while reading the device type", "deviceTypePath", deviceTypePath, "error", err)
@@ -65,39 +67,56 @@ func (b *Batteries) Enum() ([]string, error) {
 
 // Load adds battery data for all batteries found in the system.
 func (b *Batteries) Load() error {
-	b.batteries = b.batteries[:0]
+	if b.batteries == nil {
+		b.batteries = make(map[string]*Battery, 2)
+	}
 	batteryNames, err := b.Enum()
 	if err != nil {
 		return fmt.Errorf("error loading batteries: %w", err)
 	}
-	for _, n := range batteryNames {
-		bat := New(path.Join(b.root, n))
-		err := bat.Load()
-		if err != nil {
-			return fmt.Errorf("error loading battery %s: %w", n, err)
+
+	for name := range b.batteries {
+		found := false
+		for _, n := range batteryNames {
+			if n ==name {
+				found = true
+				break
+			}
 		}
-		b.batteries = append(b.batteries, *bat)
+		if !found {
+			delete(b.batteries, name)
+		}
+	}
+
+	for _, name := range batteryNames {
+		bat, ok := b.batteries[name]
+		if !ok {
+			bat = New(path.Join(b.root, name))
+			b.batteries[name] = bat
+		}
+		if err := bat.Load(); err != nil {
+			return fmt.Errorf("error loading battery %s: %w", name, err)
+		}
 	}
 	return nil
 }
 
 // isBattery checks if the power device is battery by matching the file content.
-func (b *Batteries) isBattery(base fs.FS, rel string) ([]byte, error) {
+func (b *Batteries) isBattery(base fs.FS, rel string, buffer []byte) (error) {
 	deviceTypeFile, err := base.Open(rel)
 	if err != nil {
 		// Having no type is not that expected but ok to continue
-		return nil, fmt.Errorf("found no type file for the device %s: %w", rel, err)
+		return fmt.Errorf("found no type file for the device %s: %w", rel, err)
 	}
 	defer deviceTypeFile.Close()
 
-	deviceType := make([]byte, len(batteryType))
-	n, err := deviceTypeFile.Read(deviceType)
+	n, err := deviceTypeFile.Read(buffer)
 	if err != nil {
 		// Skip unread type file
-		return nil, fmt.Errorf("failed to read type file for the device at %s: %w", rel, err)
+		return fmt.Errorf("failed to read type file for the device at %s: %w", rel, err)
 	}
-	deviceType = deviceType[:n]
-	return deviceType, nil
+	buffer = buffer[:n]
+	return nil
 }
 
 // Tooltip returns a full description for all installed batteries.
