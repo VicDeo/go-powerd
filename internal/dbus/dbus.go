@@ -11,6 +11,7 @@ func SendNotification(title, message, icon string, critical bool) error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to session bus: %w", err)
 	}
+	defer conn.Close()
 
 	obj := conn.Object("org.freedesktop.Notifications", "/org/freedesktop/Notifications")
 
@@ -44,6 +45,7 @@ func SuspendSystem() error {
 	if err != nil {
 		return fmt.Errorf("failed to connect to system bus: %w", err)
 	}
+	defer conn.Close()
 
 	obj := conn.Object("org.freedesktop.login1", "/org/freedesktop/login1")
 
