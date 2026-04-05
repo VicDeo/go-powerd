@@ -67,21 +67,53 @@ make uninstall-service
 
 # Run with verbose debug logging (includes source locations)
 ./go-powerd -t -v
+
+# Use a specific config file (overrides XDG default path)
+./go-powerd -t -c /path/to/config.toml
 ```
+
+### Command-line flags
+
+| Flag | Description |
+|------|-------------|
+| `-c path` | Path to the config file. If omitted, the default path is used (see *Verify Config Path* under Troubleshooting below). |
+| `-t` | Run as a system tray daemon. Without `-t`, the program prints battery status to stdout once and exits. |
+| `-v` | Verbose logging: enables debug level and adds source locations to log records. |
+| `-h`, `-help` | Print built-in help (version, copyright, usage) to stderr and exit with status 0. |
+
+You can also run `./go-powerd -h` (or `-help`) for the same text the binary prints on startup.
 
 ### ⚙️ Configuration
 
-The configuration is loaded from `~/.config/go-powerd/config.toml`.
+The configuration is loaded from `~/.config/go-powerd/config.toml` unless you pass `-c`.
 ```toml
 ConfigVersion = 1
 
+# All colors are 8 hex digit format with '#' prefix
+
+[theme.colors]
+segments_ok       = "#ffffffff"  # Normal digit color
+segments_low      = "#ffffffff"  # Low power digit color
+segments_charging = "#3399ffff"  # On AC digit color
+
+bar_ok            = "#33cc33ff"  # Normal battery level color
+bar_low           = "#e53333ff"  # Low battery level color
+bar_charging      = "#f2d11fff"  # On AC battery level color
+
+border            = "#ccccccff"  # Battery border color
+charger           = "#f2d11fff"  # Charger indication color
+
+
+# Policies fired while discharging only, basing on aggregate capacity 0–100%):
+#   threshold — fire when capacity is at or below this value.
+#   hysteresis — after a fire, reset only when capacity rises to threshold + hysteresis (reduces flicker).
 [policies.notify]
-active = true
+active = true     # whether notify policy is enabled
 threshold = 20    # Alert at 20%
 hysteresis = 3    # Only reset policy when battery reaches 23%
 
 [policies.suspend]
-active = true
+active = true     # whether suspend policy is enabled
 threshold = 10    # Safely suspend system via logind at 10%
 hysteresis = 5 # Only reset policy when battery reaches 15%
 ```
