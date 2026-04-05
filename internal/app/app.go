@@ -86,6 +86,7 @@ func (a *App) onReady() {
 	var lastCapacity int = -1
 	var lastIsCharging bool = false
 	trayIcon := icon.New(iconSize)
+	trayIcon.SetColors(&a.config.Theme.Colors)
 	updateUI := func() {
 		err := a.batteries.Load()
 		if err != nil {

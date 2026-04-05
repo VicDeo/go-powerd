@@ -3,7 +3,9 @@ package icon
 
 import (
 	"bytes"
+	"fmt"
 
+	"github.com/VicDeo/go-powerd/internal/config"
 	"github.com/fogleman/gg"
 )
 
@@ -14,9 +16,24 @@ var (
 
 // Icon is a struct that represents a tray icon.
 type Icon struct {
-	dc   *gg.Context
-	size float64
-	buf  *bytes.Buffer
+	dc     *gg.Context
+	size   float64
+	colors IconColors
+	buf    *bytes.Buffer
+}
+
+type IconColors struct {
+	SegmentsOk       RGBA
+	SegmentsLow      RGBA
+	SegmentsCharging RGBA
+	BarOK            RGBA
+	BarLow           RGBA
+	BarCharging      RGBA
+	Border           RGBA
+	Charger          RGBA
+}
+type RGBA struct {
+	R, G, B, A float64
 }
 
 // New creates a new Icon instance.
@@ -29,28 +46,24 @@ func New(size float64) *Icon {
 	}
 }
 
+func (i *Icon) SetColors(cfg *config.Colors) {
+	i.colors = IconColors{
+		SegmentsOk:       hexToRGBA(cfg.SegmentsOk),
+		SegmentsLow:      hexToRGBA(cfg.SegmentsLow),
+		SegmentsCharging: hexToRGBA(cfg.SegmentsCharging),
+		BarOK:            hexToRGBA(cfg.BarOk),
+		BarLow:           hexToRGBA(cfg.BarLow),
+		BarCharging:      hexToRGBA(cfg.BarCharging),
+		Border:           hexToRGBA(cfg.Border),
+		Charger:          hexToRGBA(cfg.Charger),
+	}
+}
+
 // PNG draws an icon of a battery with the current level and charger status next to it.
 func (i *Icon) PNG(percent int, charging bool) []byte {
 	i.buf.Reset()
 	i.dc.SetRGBA(0, 0, 0, 0)
 	i.dc.Clear()
-
-	digitColor := func(percent int, charging bool) (float64, float64, float64) {
-		if charging {
-			return 0.2, 0.8, 1.0
-		}
-		return 1.0, 1.0, 1.0
-	}
-
-	powerLevelColor := func(percent int, charging bool) (float64, float64, float64) {
-		if charging {
-			return 0.2, 0.6, 1.0 // blue when charging
-		}
-		if percent < 20 {
-			return 0.9, 0.2, 0.2 // red when low
-		}
-		return 0.2, 0.8, 0.2 // green when high
-	}
 
 	// Battery Icon (Left side)
 	batH := i.size * 0.2
@@ -58,18 +71,19 @@ func (i *Icon) PNG(percent int, charging bool) []byte {
 	xStart := i.size * 0.02
 	yStart := i.size - batH - 2
 
-	i.dc.SetRGB(0.8, 0.8, 0.8) // border
+	i.dc.SetRGBA(i.colors.Border.R, i.colors.Border.G, i.colors.Border.B, i.colors.Border.A) // border
 	i.dc.SetLineWidth(i.size * 0.04)
 	i.dc.DrawRectangle(xStart, yStart, batW, batH)
 	i.dc.Stroke()
 
 	// Fill
-	i.dc.SetRGB(powerLevelColor(percent, charging))
+	fillColor := i.powerLevelColor(percent, charging)
+	i.dc.SetRGBA(fillColor.R, fillColor.G, fillColor.B, fillColor.A)
 	i.dc.DrawRectangle(xStart+2, yStart+2, (float64(percent)/100.0)*(batW-4), batH-4)
 	i.dc.Fill()
 
 	if charging {
-		i.dc.SetRGB(0.95, 0.82, 0.12)
+		i.dc.SetRGBA(i.colors.Charger.R, i.colors.Charger.G, i.colors.Charger.B, i.colors.Charger.A)
 		barY := yStart - 3.0
 		i.dc.DrawRectangle(xStart, barY, batW, 3.0)
 		i.dc.Fill()
@@ -78,7 +92,8 @@ func (i *Icon) PNG(percent int, charging bool) []byte {
 	textX := 0.2
 	textY := 0.1
 
-	i.dc.SetRGB(digitColor(percent, charging))
+	segmentColor := i.digitColor(percent, charging)
+	i.dc.SetRGBA(segmentColor.R, segmentColor.G, segmentColor.B, segmentColor.A)
 	if percent >= 100 {
 		textX = -0.5
 		i.drawDigit(1, textX, textY, i.size*0.5)
@@ -91,6 +106,26 @@ func (i *Icon) PNG(percent int, charging bool) []byte {
 
 	i.dc.EncodePNG(i.buf)
 	return i.buf.Bytes()
+}
+
+func (i *Icon) digitColor(percent int, charging bool) RGBA {
+	if charging {
+		return i.colors.SegmentsCharging
+	}
+	if percent < 20 {
+		return i.colors.SegmentsLow
+	}
+	return i.colors.SegmentsOk
+}
+
+func (i *Icon) powerLevelColor(percent int, charging bool) RGBA {
+	if charging {
+		return i.colors.BarCharging
+	}
+	if percent < 20 {
+		return i.colors.BarLow
+	}
+	return i.colors.BarOK
 }
 
 // drawDigit draws a retro 7 segment digit.
@@ -120,4 +155,15 @@ func (i *Icon) drawDigit(val int, x, y, size float64) {
 	drawSeg(0x20, 0, 0.1+gap, 0.1, 0.3)       // F
 	drawSeg(0x40, 0.1+gap, 0.4+gap, 0.4, 0.1) // G
 	i.dc.Fill()
+}
+
+func hexToRGBA(hex string) RGBA {
+	var r, g, b, a int
+	fmt.Sscanf(hex, "#%02x%02x%02x%02x", &r, &g, &b, &a)
+	return RGBA{
+		R: float64(r) / 255.0,
+		G: float64(g) / 255.0,
+		B: float64(b) / 255.0,
+		A: float64(a) / 255.0,
+	}
 }
