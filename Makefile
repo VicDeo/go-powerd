@@ -1,5 +1,5 @@
 BINARY_NAME=go-powerd
-VERSION=0.1.0
+VERSION=0.2.0
 PREFIX ?= /usr/local
 BINDIR=$(PREFIX)/bin
 SERVICE_NAME=go-powerd.service
