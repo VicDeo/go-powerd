@@ -1,4 +1,4 @@
-// Package app provides the application logic for the go-powerd app.
+// Package app implements the application logic for the go-powerd app.
 package app
 
 import (

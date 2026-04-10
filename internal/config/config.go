@@ -130,7 +130,7 @@ func validateColors(config *Config) {
 	}
 }
 
-// DefaultConfigPath returns the default config path.
+// DefaultPath returns the default path to the config file.
 func DefaultPath() (string, error) {
 	dir, err := os.UserConfigDir()
 	if err != nil {

@@ -1,4 +1,4 @@
-// debounce package provides a generic debouncer with a configurable interval and a callback.
+// Package debounce provides a generic debouncer with a configurable interval and a callback.
 package debounce
 
 import (

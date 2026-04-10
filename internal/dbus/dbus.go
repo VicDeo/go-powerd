@@ -1,3 +1,4 @@
+// Package dbus provides a way to send notifications and suspend the system.
 package dbus
 
 import (

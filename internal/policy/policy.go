@@ -1,4 +1,4 @@
-// policy is the package to deal with the policies.
+// Package policy implements the policies for the go-powerd app.
 package policy
 
 // Policy is a struct that represents a policy.
@@ -13,7 +13,8 @@ type Policy struct {
 	OnReset     func()
 }
 
-// Evaluate evaluates the policy. It is called when the battery level changes.
+// Evaluate evaluates the policy.
+// It is called when the battery level or charging status changes.
 func (p *Policy) Evaluate(current int) {
 	if p.TriggerOnRising {
 		// CHARGING case (e.g., Alert at 95%, Reset at 90%)

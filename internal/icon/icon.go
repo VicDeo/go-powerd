@@ -1,4 +1,4 @@
-// icon package draws a tray icon.
+// Package icon draws a tray icon depending on the battery level and charging status.
 package icon
 
 import (
@@ -59,7 +59,7 @@ func (i *Icon) SetColors(cfg *config.Colors) {
 	}
 }
 
-// PNG draws an icon of a battery with the current level and charger status next to it.
+// PNG draws an icon of a battery with the current level and charger status.
 func (i *Icon) PNG(percent int, charging bool) []byte {
 	i.buf.Reset()
 	i.dc.SetRGBA(0, 0, 0, 0)
@@ -128,7 +128,7 @@ func (i *Icon) powerLevelColor(percent int, charging bool) RGBA {
 	return i.colors.BarOK
 }
 
-// drawDigit draws a retro 7 segment digit.
+// drawDigit draws a retro 7-segment digit.
 func (i *Icon) drawDigit(val int, x, y, size float64) {
 	// Segment definitions (A-G)
 	// A: top, B: top-right, C: bottom-right, D: bottom, E: bottom-left, F: top-left, G: middle

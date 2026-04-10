@@ -1,4 +1,4 @@
-// netlink package listens to kernel events, filters power events and reports them back.
+// Package netlink listens to kernel events, filters power events and reports them back.
 package netlink
 
 import (
@@ -20,7 +20,7 @@ var (
 	}
 )
 
-// Listen subscribes to the kernel events and executes a callback on all power events.
+// Listen subscribes to the kernel events and executes a callback on power events only.
 func Listen(ctx context.Context, onEvent func(data []byte)) error {
 	fd, err := unix.Socket(
 		unix.AF_NETLINK,
@@ -68,7 +68,7 @@ func Listen(ctx context.Context, onEvent func(data []byte)) error {
 		return err
 	}
 
-	// When ctx is done, write to pipe to wake epoll
+	// When ctx is done, write to eventfd to wake epoll
 	var once sync.Once
 	stop := func() {
 		once.Do(func() {

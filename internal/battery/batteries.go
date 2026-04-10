@@ -31,7 +31,7 @@ type Batteries struct {
 	builder   strings.Builder     // Builder for the tooltip
 }
 
-// NewBatteries return a new empty Batteries collection.
+// NewBatteries creates a new empty Batteries collection.
 func NewBatteries(root string) *Batteries {
 	return &Batteries{root: root, builder: strings.Builder{}}
 }
@@ -153,7 +153,7 @@ func (b *Batteries) Tooltip(version string) string {
 	return b.builder.String()
 }
 
-// Capacity returns a common capacity for all batteries.
+// Capacity returns an aggregated capacity for all batteries.
 func (b *Batteries) Capacity() int {
 	if len(b.batteries) == 0 {
 		return 0

@@ -1,4 +1,4 @@
-// battery is the package to deal with battery info.
+// Package battery deals with battery info.
 package battery
 
 import (
@@ -72,7 +72,7 @@ var (
 	}
 )
 
-// Battery represents a crucial battery params.
+// Battery represents key battery parameters.
 type Battery struct {
 	Path             string // Path to the battery directory
 	Name             string // Battery name

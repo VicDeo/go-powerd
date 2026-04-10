@@ -1,4 +1,4 @@
-// Main package for the go-powerd app.
+// Package main implements the go-powerd app.
 package main
 
 import (
