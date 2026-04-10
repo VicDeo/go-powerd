@@ -53,6 +53,14 @@ func (a *App) Run() error {
 		return fmt.Errorf("error initializing batteries info: %w", err)
 	}
 
+	if a.batteries.Len() == 0 {
+		return fmt.Errorf("no batteries found")
+	}
+
+	if a.batteries.Capacity() == 0 {
+		return fmt.Errorf("no batteries with capacity found")
+	}
+
 	a.parseConfig()
 
 	systray.Run(a.onReady, a.onExit)

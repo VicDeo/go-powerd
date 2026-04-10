@@ -189,3 +189,8 @@ func (b *Batteries) Status() string {
 	}
 	return "Discharging"
 }
+
+// Len returns the number of batteries.
+func (b *Batteries) Len() int {
+	return len(b.batteries)
+}
