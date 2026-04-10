@@ -28,11 +28,12 @@ type Batteries struct {
 	root      string              // Path to a batteries root directory.
 	batteries []*Battery          // All discovered batteries as a slice
 	lookup    map[string]*Battery // All discovered batteries as a map BATn -> *data
+	builder   strings.Builder     // Builder for the tooltip
 }
 
 // NewBatteries return a new empty Batteries collection.
 func NewBatteries(root string) *Batteries {
-	return &Batteries{root: root}
+	return &Batteries{root: root, builder: strings.Builder{}}
 }
 
 // Enum provides the list of available battery directory names.
@@ -134,20 +135,22 @@ func (b *Batteries) deviceType(base fs.FS, rel string, buf *pool.Buffer) error {
 
 // Tooltip returns a full description for all installed batteries.
 func (b *Batteries) Tooltip(version string) string {
-	builder := strings.Builder{}
-	builder.WriteString("go-powerd v" + version + "\n")
+	b.builder.Reset()
+	b.builder.WriteString("go-powerd v" + version + "\n")
 	for _, bat := range b.batteries {
 		health, err := bat.Health()
 		if err != nil {
 			slog.Warn("Error while getting battery health", "error", err)
-			fmt.Fprintf(&builder,
-				"\n%s [%s]\nPower: %d%%\nHealth: Unknown\n", bat.Name, bat.ExtendedStatus(), bat.Capacity)
+			fmt.Fprintf(&b.builder,
+				"\n%s [%s]\nPower: %d%%\nHealth: Unknown\n",
+				bat.Name, bat.ExtendedStatus(), bat.Capacity)
 		} else {
-			fmt.Fprintf(&builder,
-				"\n%s [%s]\nPower: %d%%\nHealth: %d%%\n", bat.Name, bat.ExtendedStatus(), bat.Capacity, health)
+			fmt.Fprintf(&b.builder,
+				"\n%s [%s]\nPower: %d%%\nHealth: %s (%d%%)\n",
+				bat.Name, bat.ExtendedStatus(), bat.Capacity, b.healthToString(health), health)
 		}
 	}
-	return builder.String()
+	return b.builder.String()
 }
 
 // Capacity returns a common capacity for all batteries.
@@ -193,4 +196,22 @@ func (b *Batteries) Status() string {
 // Len returns the number of batteries.
 func (b *Batteries) Len() int {
 	return len(b.batteries)
+}
+
+func (b *Batteries) healthToString(health int) string {
+	if health <= 0 || health > 100 {
+		return "Unknown"
+	}
+	switch {
+	case health >= 90:
+		return "New"
+	case health >= 70:
+		return "Good"
+	case health >= 50:
+		return "Fair"
+	case health >= 30:
+		return "Weak"
+	default:
+		return "Poor"
+	}
 }
