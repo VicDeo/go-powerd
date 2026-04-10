@@ -9,7 +9,7 @@ COMMIT_HASH=$(shell git rev-parse --short HEAD 2>/dev/null || echo "none")
 DIRTY := $(shell git diff --quiet || echo "-dirty")
 
 # LDFLAGS: -s -w for size, and injecting version + commit info
-LDFLAGS=-ldflags "-s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT_HASH)$(DIRTY)"
+LDFLAGS=-trimpath -ldflags "-s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT_HASH)$(DIRTY)"
 
 .PHONY: all build install uninstall clean test help
 
