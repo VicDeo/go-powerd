@@ -7,6 +7,7 @@ import (
 	"log/slog"
 	"os"
 	"path"
+	"slices"
 	"strings"
 
 	"github.com/VicDeo/go-powerd/internal/pool"
@@ -25,7 +26,8 @@ var (
 // Batteries is a collection of all available batteries on the system.
 type Batteries struct {
 	root      string              // Path to a batteries root directory.
-	batteries map[string]*Battery // All discovered batteries.
+	batteries []*Battery          // All discovered batteries as a slice
+	lookup    map[string]*Battery // All discovered batteries as a map BATn -> *data
 }
 
 // NewBatteries return a new empty Batteries collection.
@@ -35,8 +37,6 @@ func NewBatteries(root string) *Batteries {
 
 // Enum provides the list of available battery directory names.
 func (b *Batteries) Enum() ([]string, error) {
-	var batteryNames []string
-
 	if _, err := os.Stat(b.root); err != nil {
 		return nil, fmt.Errorf("could not initialize Power Supply subsystem at %s: %w", b.root, err)
 	}
@@ -47,11 +47,13 @@ func (b *Batteries) Enum() ([]string, error) {
 		return nil, fmt.Errorf("could not read entries in %s: %w", b.root, err)
 	}
 
+	foundNames := make([]string, 0, len(entries))
 	dt := pool.Get()
 	defer pool.Put(dt)
-	for _, device := range entries {
-		deviceTypePath := path.Join(device.Name(), typeFilename)
 
+	for _, device := range entries {
+		dt.Reset()
+		deviceTypePath := path.Join(device.Name(), typeFilename)
 		err := b.deviceType(sysfs, deviceTypePath, dt)
 		if err != nil {
 			// Just skip the device we can't read
@@ -59,49 +61,56 @@ func (b *Batteries) Enum() ([]string, error) {
 			continue
 		}
 
-		slog.Debug("Type file content", "deviceTypePath", deviceTypePath, "deviceType", dt)
 		if bytes.Equal(dt.Data(), batteryType) {
-			batteryNames = append(batteryNames, device.Name())
+			foundNames = append(foundNames, device.Name())
+		} else {
+			slog.Debug("Device is not a battery", "deviceTypePath", deviceTypePath, "deviceType", dt.Data())
 		}
-		dt.Reset()
 	}
 
-	return batteryNames, nil
+	slices.Sort(foundNames)
+	slog.Debug("Devices found", "devices", foundNames)
+
+	return foundNames, nil
 }
 
 // Load adds battery data for all batteries found in the system.
 func (b *Batteries) Load() error {
-	if b.batteries == nil {
-		b.batteries = make(map[string]*Battery, 2)
-	}
-	batteryNames, err := b.Enum()
+	names, err := b.Enum()
 	if err != nil {
-		return fmt.Errorf("error loading batteries: %w", err)
+		return err
 	}
 
-	for name := range b.batteries {
-		found := false
-		for _, n := range batteryNames {
-			if n == name {
-				found = true
-				break
-			}
-		}
-		if !found {
-			delete(b.batteries, name)
-		}
+	if b.lookup == nil {
+		b.lookup = make(map[string]*Battery, len(names))
 	}
 
-	for _, name := range batteryNames {
-		bat, ok := b.batteries[name]
+	b.batteries = b.batteries[:0]
+
+	for _, name := range names {
+		bat, ok := b.lookup[name]
 		if !ok {
 			bat = New(path.Join(b.root, name))
-			b.batteries[name] = bat
+			b.lookup[name] = bat
 		}
+
 		if err := bat.Load(); err != nil {
-			return fmt.Errorf("error loading battery %s: %w", name, err)
+			slog.Warn("Error loading battery", "name", name, "err", err)
+			continue
+		}
+
+		b.batteries = append(b.batteries, bat)
+	}
+
+	// Cleanup map entries
+	if len(b.lookup) > len(b.batteries) {
+		for name := range b.lookup {
+			if !slices.Contains(names, name) {
+				delete(b.lookup, name)
+			}
 		}
 	}
+
 	return nil
 }
 
@@ -153,7 +162,7 @@ func (b *Batteries) Capacity() int {
 	}
 
 	if totalEnergyFull == 0 {
-		slog.Error("No energy full capacity available for aggregate", "totalEnergyFull", totalEnergyFull, "batteriesCount", len(b.batteries))
+		slog.Error("No energy full capacity available for aggregate", "totalEnergyFull", totalEnergyFull, "batteriesCount", len(b.lookup))
 		return 0
 	}
 
