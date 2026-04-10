@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path"
+
 	"github.com/VicDeo/go-powerd/internal/pool"
 )
 
