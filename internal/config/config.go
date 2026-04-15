@@ -43,7 +43,7 @@ type Theme struct {
 }
 
 type Policy struct {
-	Active     *bool
+	Active     bool
 	Threshold  int
 	Hysteresis int
 }
@@ -152,15 +152,14 @@ func DefaultConfig() *Config {
 
 // DefaultPolicies returns the default policies.
 func DefaultPolicies() Policies {
-	active := true
 	return Policies{
 		Notify: Policy{
-			Active:     &active,
+			Active:     true,
 			Threshold:  20,
 			Hysteresis: 3,
 		},
 		Suspend: Policy{
-			Active:     &active,
+			Active:     true,
 			Threshold:  10,
 			Hysteresis: 5,
 		},

@@ -155,7 +155,7 @@ func (a *App) onExit() {
 
 func (a *App) parseConfig() {
 
-	if a.config.Policies.Notify.Active != nil && *a.config.Policies.Notify.Active == true {
+	if a.config.Policies.Notify.Active {
 		lowPolicy := policy.Policy{
 			Name:       "Low",
 			Threshold:  a.config.Policies.Notify.Threshold,
@@ -170,7 +170,7 @@ func (a *App) parseConfig() {
 		a.dischargingPolicies = append(a.dischargingPolicies, &lowPolicy)
 	}
 
-	if a.config.Policies.Suspend.Active != nil && *a.config.Policies.Suspend.Active == true {
+	if a.config.Policies.Suspend.Active {
 		criticalPolicy := policy.Policy{
 			Name:       "Critical",
 			Threshold:  a.config.Policies.Suspend.Threshold,
