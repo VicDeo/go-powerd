@@ -173,14 +173,14 @@ func (b *Batteries) Capacity() int {
 	return int(capacity)
 }
 
-// IsCharging returns true if any battery is charging.
-func (b *Batteries) IsCharging() bool {
+// IsPluggedIn returns true if any battery is charging.
+func (b *Batteries) IsPluggedIn() bool {
 	for _, bat := range b.batteries {
-		if bat.Status == statusCharging {
-			return true
+		if bat.Status == statusDischarging {
+			return false
 		}
 	}
-	return false
+	return true
 }
 
 // Status returns the status of the batteries.

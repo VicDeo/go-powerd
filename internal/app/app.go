@@ -102,7 +102,7 @@ func (a *App) onReady() {
 			return
 		}
 		systray.SetTitle(a.batteries.Tooltip(a.version))
-		cap, charging := a.batteries.Capacity(), a.batteries.IsCharging()
+		cap, charging := a.batteries.Capacity(), a.batteries.IsPluggedIn()
 		if lastCapacity != cap || lastIsCharging != charging {
 			coordinator.HandleUpdate(cap, a.batteries.Status())
 			lastCapacity = cap
