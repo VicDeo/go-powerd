@@ -107,8 +107,11 @@ func (a *App) onReady() {
 			coordinator.HandleUpdate(cap, a.batteries.Status())
 			lastCapacity = cap
 			lastIsCharging = charging
-			systray.SetIcon(trayIcon.PNG(cap, charging))
-			debug.FreeOSMemory()
+			icon, fromCache := trayIcon.Get(cap, charging)
+			systray.SetIcon(icon)
+			if !fromCache {
+				debug.FreeOSMemory()
+			}
 		}
 	}
 

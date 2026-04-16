@@ -4,6 +4,7 @@ package icon
 import (
 	"bytes"
 	"fmt"
+	"sync"
 
 	"github.com/VicDeo/go-powerd/internal/config"
 	"github.com/fogleman/gg"
@@ -20,6 +21,8 @@ type Icon struct {
 	size   float64
 	colors IconColors
 	buf    *bytes.Buffer
+	cache  [2][101][]byte
+	mu     sync.Mutex
 }
 
 type IconColors struct {
@@ -57,6 +60,40 @@ func (i *Icon) SetColors(cfg *config.Colors) {
 		Border:           hexToRGBA(cfg.Border),
 		Charger:          hexToRGBA(cfg.Charger),
 	}
+}
+
+// Get returns the battery icon from the lazily populated cache.
+func (i *Icon) Get(percent int, charging bool) (icon []byte, fromCache bool) {
+	var index int
+	if charging {
+		index = 1
+	} else {
+		index = 0
+	}
+
+	i.mu.Lock()
+	defer i.mu.Unlock()
+
+	fromCache = true
+	if i.cache[index][percent] == nil {
+		pngData := i.PNG(percent, charging)
+
+		storage := make([]byte, len(pngData))
+		copy(storage, pngData)
+
+		i.cache[index][percent] = storage
+		fromCache = false
+	}
+	icon = i.cache[index][percent]
+
+	return icon, fromCache
+}
+
+// Reset resets the cached icons.
+func (i *Icon) Reset() {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	i.cache = [2][101][]byte{}
 }
 
 // PNG draws an icon of a battery with the current level and charger status.
