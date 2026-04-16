@@ -96,7 +96,7 @@ func (b *Batteries) Load() error {
 		}
 
 		if err := bat.Load(); err != nil {
-			slog.Warn("Error loading battery", "name", name, "err", err)
+			slog.Warn("Error loading battery", "name", name, "error", err)
 			continue
 		}
 
