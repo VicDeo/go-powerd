@@ -4,21 +4,21 @@ type Coordinator struct {
 	ChargingMngr    *Manager
 	DischargingMngr *Manager
 	ActiveMngr      *Manager
-	LastStatus      string // "Charging", "Discharging", etc.
+	LastStatus      bool // true when there is power, false when not
 }
 
-func (c *Coordinator) HandleUpdate(capacity int, status string) {
-	if status != c.LastStatus {
+func (c *Coordinator) HandleUpdate(capacity int, isPluggedIn bool) {
+	if isPluggedIn != c.LastStatus {
 		if c.ActiveMngr != nil {
 			c.ActiveMngr.ResetAll()
 		}
 
-		if status == "Charging" || status == "Full" {
+		if isPluggedIn {
 			c.ActiveMngr = c.ChargingMngr
 		} else {
 			c.ActiveMngr = c.DischargingMngr
 		}
-		c.LastStatus = status
+		c.LastStatus = isPluggedIn
 	}
 
 	if c.ActiveMngr != nil {

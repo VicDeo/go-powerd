@@ -140,7 +140,7 @@ func (a *App) initCoordinator() *policy.Coordinator {
 		ChargingMngr:    &policy.Manager{Name: "Charging"},
 		DischargingMngr: discharging,
 		ActiveMngr:      nil,
-		LastStatus:      "",
+		LastStatus:      true,
 	}
 }
 
@@ -155,7 +155,7 @@ func (a *App) updateUI() {
 	a.uiStateMu.Lock()
 	defer a.uiStateMu.Unlock()
 	if a.uiState.capacity != newState.capacity || a.uiState.isPluggedIn != newState.isPluggedIn {
-		a.coordinator.HandleUpdate(newState.capacity, a.batteries.Status())
+		a.coordinator.HandleUpdate(newState.capacity, newState.isPluggedIn)
 		appIcon, fromCache := a.icon.Get(newState.capacity, newState.isPluggedIn)
 		a.uiState.capacity = newState.capacity
 		a.uiState.isPluggedIn = newState.isPluggedIn

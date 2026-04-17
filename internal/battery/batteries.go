@@ -188,16 +188,6 @@ func (b *Batteries) IsPluggedIn() bool {
 	return true
 }
 
-// Status returns the status of the batteries.
-func (b *Batteries) Status() string {
-	for _, bat := range b.batteries {
-		if bat.Status == statusCharging {
-			return "Charging"
-		}
-	}
-	return "Discharging"
-}
-
 // Len returns the number of batteries.
 func (b *Batteries) Len() int {
 	return len(b.batteries)
