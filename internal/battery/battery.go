@@ -207,12 +207,20 @@ func formatDuration(seconds float64) string {
 
 func atoi64(b []byte) (int64, error) {
 	var res int64
+	isNegative := false
 	for i := 0; i < len(b); i++ {
+		if i == 0 && b[i] == byte('-') {
+			isNegative = true
+			continue
+		}
 		if b[i] >= byte('0') && b[i] <= byte('9') {
 			res = res*10 + int64(b[i]-'0')
 		} else {
 			return 0, fmt.Errorf("ascii to int conversion failed. invalid source: %s", string(b))
 		}
+	}
+	if isNegative {
+		res = -res
 	}
 	return res, nil
 }
