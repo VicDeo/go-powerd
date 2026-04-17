@@ -11,7 +11,6 @@ import (
 
 	"github.com/VicDeo/go-powerd/internal/battery"
 	"github.com/VicDeo/go-powerd/internal/config"
-	"github.com/VicDeo/go-powerd/internal/dbus"
 	"github.com/VicDeo/go-powerd/internal/debounce"
 	"github.com/VicDeo/go-powerd/internal/icon"
 	"github.com/VicDeo/go-powerd/internal/netlink"
@@ -30,13 +29,21 @@ const (
 	iconSize = 32.0
 )
 
+type uiState struct {
+	capacity    int
+	isPluggedIn bool
+}
+
 // App is the main application struct.
 type App struct {
 	config              *config.Config
 	batteries           *battery.Batteries
 	dischargingPolicies []*policy.Policy
 	version             string
-	mu                  sync.Mutex
+	uiState             uiState
+	uiStateMu           sync.Mutex
+	icon                *icon.Icon
+	coordinator         *policy.Coordinator
 }
 
 // New creates a new App instance.
@@ -64,6 +71,10 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	a.parseConfig()
+	a.uiState = uiState{capacity: -1, isPluggedIn: false}
+	a.coordinator = a.initCoordinator()
+	a.icon = icon.New(iconSize)
+	a.icon.SetColors(&a.config.Theme.Colors)
 
 	runCtx, cancel := context.WithCancel(ctx)
 	systray.Run(
@@ -81,47 +92,15 @@ func (a *App) Status() (string, error) {
 	return a.batteries.Tooltip(a.version), nil
 }
 
+func (a *App) onExit() {
+	// Nothing to do here
+}
+
 // onReady is the callback function for the systray.
 func (a *App) onReady(ctx context.Context, cancel context.CancelFunc) {
-	discharging := &policy.Manager{
-		Name:     "On Battery",
-		Policies: a.dischargingPolicies,
-	}
+	a.updateUI()
 
-	coordinator := &policy.Coordinator{
-		ChargingMngr:    &policy.Manager{Name: "Charging"},
-		DischargingMngr: discharging,
-		ActiveMngr:      nil,
-		LastStatus:      "",
-	}
-
-	var lastCapacity int = -1
-	var lastIsCharging bool = false
-	trayIcon := icon.New(iconSize)
-	trayIcon.SetColors(&a.config.Theme.Colors)
-	updateUI := func() {
-		err := a.batteries.Load()
-		if err != nil {
-			slog.Error("Error reading batteries info", "error", err)
-			return
-		}
-		systray.SetTitle(a.batteries.Tooltip(a.version))
-		cap, charging := a.batteries.Capacity(), a.batteries.IsPluggedIn()
-		if lastCapacity != cap || lastIsCharging != charging {
-			coordinator.HandleUpdate(cap, a.batteries.Status())
-			lastCapacity = cap
-			lastIsCharging = charging
-			icon, fromCache := trayIcon.Get(cap, charging)
-			systray.SetIcon(icon)
-			if !fromCache {
-				debug.FreeOSMemory()
-			}
-		}
-	}
-
-	updateUI()
-
-	deb := debounce.New(debounceWindow, updateUI)
+	deb := debounce.New(debounceWindow, a.updateUI)
 	defer deb.Stop()
 
 	onPowerEvent := func([]byte) {
@@ -148,6 +127,46 @@ func (a *App) onReady(ctx context.Context, cancel context.CancelFunc) {
 		}
 	}()
 
+	a.setupMenu(cancel)
+}
+
+func (a *App) initCoordinator() *policy.Coordinator {
+	discharging := &policy.Manager{
+		Name:     "On Battery",
+		Policies: a.dischargingPolicies,
+	}
+
+	return &policy.Coordinator{
+		ChargingMngr:    &policy.Manager{Name: "Charging"},
+		DischargingMngr: discharging,
+		ActiveMngr:      nil,
+		LastStatus:      "",
+	}
+}
+
+func (a *App) updateUI() {
+	err := a.batteries.Load()
+	if err != nil {
+		slog.Error("Error reading batteries info", "error", err)
+		return
+	}
+	systray.SetTitle(a.batteries.Tooltip(a.version))
+	newState := uiState{capacity: a.batteries.Capacity(), isPluggedIn: a.batteries.IsPluggedIn()}
+	a.uiStateMu.Lock()
+	defer a.uiStateMu.Unlock()
+	if a.uiState.capacity != newState.capacity || a.uiState.isPluggedIn != newState.isPluggedIn {
+		a.coordinator.HandleUpdate(newState.capacity, a.batteries.Status())
+		appIcon, fromCache := a.icon.Get(newState.capacity, newState.isPluggedIn)
+		a.uiState.capacity = newState.capacity
+		a.uiState.isPluggedIn = newState.isPluggedIn
+		systray.SetIcon(appIcon)
+		if !fromCache {
+			debug.FreeOSMemory()
+		}
+	}
+}
+
+func (a *App) setupMenu(cancel context.CancelFunc) {
 	mQuit := systray.AddMenuItem("Quit", "Quit the application")
 	mQuit.Enable()
 	mQuit.Click(func() {
@@ -156,22 +175,13 @@ func (a *App) onReady(ctx context.Context, cancel context.CancelFunc) {
 	})
 }
 
-func (a *App) onExit() {
-	// Nothing to do here
-}
-
 func (a *App) parseConfig() {
 	if a.config.Policies.Notify.Active {
 		lowPolicy := policy.Policy{
 			Name:       "Low",
 			Threshold:  a.config.Policies.Notify.Threshold,
 			Hysteresis: a.config.Policies.Notify.Hysteresis,
-			OnTrigger: func() {
-				err := dbus.SendNotification("Low Battery!", "Connect a power source as soon as possible.", "battery-caution", true)
-				if err != nil {
-					slog.Error("Error sending notification", "error", err)
-				}
-			},
+			OnTrigger:  sendNotification,
 		}
 		a.dischargingPolicies = append(a.dischargingPolicies, &lowPolicy)
 	}
@@ -181,12 +191,7 @@ func (a *App) parseConfig() {
 			Name:       "Critical",
 			Threshold:  a.config.Policies.Suspend.Threshold,
 			Hysteresis: a.config.Policies.Suspend.Hysteresis,
-			OnTrigger: func() {
-				err := dbus.SuspendSystem()
-				if err != nil {
-					slog.Error("Error suspending system", "error", err)
-				}
-			},
+			OnTrigger:  sendSuspendSystem,
 		}
 		a.dischargingPolicies = append(a.dischargingPolicies, &criticalPolicy)
 	}
