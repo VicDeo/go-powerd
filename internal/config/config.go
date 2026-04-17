@@ -194,7 +194,7 @@ func validRGBA(rgba string) error {
 		return fmt.Errorf("rgba should start with #. Not a valid RGBA: %s", rgba)
 	}
 
-	// lower and check that we have 8 digits 0-f
+	// lowercase and check that we have 8 digits 0-f
 	for _, c := range strings.ToLower(rgba[1:]) {
 		if !((c >= '0' && c <= '9') || (c >= 'a' && c <= 'f')) {
 			return fmt.Errorf("invalid character found. Not a valid RGBA: %s", rgba)

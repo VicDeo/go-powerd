@@ -114,7 +114,7 @@ func Listen(ctx context.Context, onEvent func(data []byte)) error {
 				}
 			case efd:
 				// Context cancelled
-				// read the data before bail out
+				// read the data before bailing out
 				var tmp [8]byte
 				unix.Read(efd, tmp[:])
 				return ctx.Err()

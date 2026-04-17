@@ -90,7 +90,7 @@ type Battery struct {
 	EnergyFullDesign int64  // microwatt-hours
 	PowerNow         int64  // microwatts
 	CycleCount       int    // number of full charge-discharge cycles
-	Present          bool   // If the battery attached right now
+	Present          bool   // Whether the battery is attached right now
 }
 
 // New creates a new battery.

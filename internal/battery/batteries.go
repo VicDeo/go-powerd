@@ -55,7 +55,7 @@ func (b *Batteries) Enum() ([]string, error) {
 	for _, device := range entries {
 		dt.Reset()
 		deviceTypePath := path.Join(device.Name(), typeFilename)
-		err := b.deviceType(sysfs, deviceTypePath, dt)
+		err := b.readType(sysfs, deviceTypePath, dt)
 		if err != nil {
 			// Just skip the device we can't read
 			slog.Warn("Error while reading the device type", "deviceTypePath", deviceTypePath, "error", err)
@@ -115,8 +115,8 @@ func (b *Batteries) Load() error {
 	return nil
 }
 
-// deviceType checks if the power device is battery by matching the file content.
-func (b *Batteries) deviceType(base fs.FS, rel string, buf *pool.Buffer) error {
+// readType reads the type of the power device from the file.
+func (b *Batteries) readType(base fs.FS, rel string, buf *pool.Buffer) error {
 	deviceTypeFile, err := base.Open(rel)
 	if err != nil {
 		// Having no type is not that expected but ok to continue
@@ -173,9 +173,14 @@ func (b *Batteries) Capacity() int {
 	return int(capacity)
 }
 
-// IsPluggedIn returns true if any battery is charging.
+// IsPluggedIn returns true if the system is connected to AC power,
+// i.e. no battery is actively discharging.
 func (b *Batteries) IsPluggedIn() bool {
+	if len(b.batteries) == 0 {
+		return false
+	}
 	for _, bat := range b.batteries {
+		// If any battery is discharging, the system is not plugged in
 		if bat.Status == statusDischarging {
 			return false
 		}

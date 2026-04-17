@@ -112,7 +112,7 @@ func (i *Icon) PNG(percent int, charging bool) []byte {
 	i.dc.SetRGBA(0, 0, 0, 0)
 	i.dc.Clear()
 
-	// Battery Icon (Left side)
+	// Battery Icon.
 	batH := i.size * 0.2
 	batW := i.size * 0.85
 	xStart := i.size * 0.02
