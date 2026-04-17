@@ -2,10 +2,13 @@
 package main
 
 import (
+	"context"
 	"flag"
 	"fmt"
 	"log/slog"
 	"os"
+	"os/signal"
+	"syscall"
 
 	"github.com/VicDeo/go-powerd/internal/app"
 	"github.com/VicDeo/go-powerd/internal/config"
@@ -52,7 +55,9 @@ func main() {
 	a := app.New(version, cfg)
 	if tray {
 		slog.Info("Starting go-powerd", "version", version, "commit", commit, "verbose", verbose)
-		if err := a.Run(); err != nil {
+		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+		defer stop()
+		if err := a.Run(ctx); err != nil {
 			slog.Error("Error starting the application", "error", err)
 			slog.Info("Shutting down go-powerd", "version", version)
 			os.Exit(1)

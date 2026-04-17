@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log/slog"
 	"runtime/debug"
+	"sync"
 	"time"
 
 	"github.com/VicDeo/go-powerd/internal/battery"
@@ -35,6 +36,7 @@ type App struct {
 	batteries           *battery.Batteries
 	dischargingPolicies []*policy.Policy
 	version             string
+	mu                  sync.Mutex
 }
 
 // New creates a new App instance.
@@ -47,7 +49,7 @@ func New(version string, cfg *config.Config) *App {
 }
 
 // Run runs the application.
-func (a *App) Run() error {
+func (a *App) Run(ctx context.Context) error {
 	err := a.batteries.Load()
 	if err != nil {
 		return fmt.Errorf("error initializing batteries info: %w", err)
@@ -63,7 +65,11 @@ func (a *App) Run() error {
 
 	a.parseConfig()
 
-	systray.Run(a.onReady, a.onExit)
+	runCtx, cancel := context.WithCancel(ctx)
+	systray.Run(
+		func() { a.onReady(runCtx, cancel) },
+		a.onExit,
+	)
 	return nil
 }
 
@@ -76,9 +82,7 @@ func (a *App) Status() (string, error) {
 }
 
 // onReady is the callback function for the systray.
-func (a *App) onReady() {
-	ctx, cancel := context.WithCancel(context.Background())
-
+func (a *App) onReady(ctx context.Context, cancel context.CancelFunc) {
 	discharging := &policy.Manager{
 		Name:     "On Battery",
 		Policies: a.dischargingPolicies,
@@ -157,7 +161,6 @@ func (a *App) onExit() {
 }
 
 func (a *App) parseConfig() {
-
 	if a.config.Policies.Notify.Active {
 		lowPolicy := policy.Policy{
 			Name:       "Low",
