@@ -4,6 +4,7 @@ package icon
 import (
 	"bytes"
 	"fmt"
+	"log/slog"
 	"sync"
 
 	"github.com/VicDeo/go-powerd/internal/config"
@@ -64,6 +65,15 @@ func (i *Icon) SetColors(cfg *config.Colors) {
 
 // Get returns the battery icon from the lazily populated cache.
 func (i *Icon) Get(percent int, charging bool) (icon []byte, fromCache bool) {
+	if percent < 0 {
+		slog.Warn("Argument is not within 0-100 range", "percent", percent)
+		percent = 0
+	}
+	if percent > 100 {
+		slog.Warn("Argument is not within 0-100 range", "percent", percent)
+		percent = 100
+	}
+
 	var index int
 	if charging {
 		index = 1
