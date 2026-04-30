@@ -158,7 +158,7 @@ func (b *Batteries) Capacity() int {
 	if len(b.batteries) == 0 {
 		return 0
 	}
-	var totalEnergyFull, totalEnergyNow int64
+	var totalEnergyFull, totalEnergyNow WattHour
 	for _, bat := range b.batteries {
 		totalEnergyFull += bat.EnergyFull
 		totalEnergyNow += bat.EnergyNow
@@ -186,6 +186,29 @@ func (b *Batteries) IsPluggedIn() bool {
 		}
 	}
 	return true
+}
+
+func (b *Batteries) Log() {
+	for _, bat := range b.batteries {
+		slog.Info("battery metrics",
+			"name", bat.Name,
+			"manufacturer", bat.Manufacturer,
+			"model_name", bat.ModelName,
+			"serial_number", bat.SerialNumber,
+			"technology", bat.Technology,
+			"status", bat.Status,
+			"capacity", bat.Capacity,
+			"capacity_level", bat.CapacityLevel,
+			"present", bat.Present,
+			"voltage_v", bat.VoltageNow,
+			"voltage_min_design_v", bat.VoltageMinDesign,
+			"power_now_w", bat.PowerNow,
+			"energy_now_wh", bat.EnergyNow,
+			"energy_full_wh", bat.EnergyFull,
+			"energy_full_design_wh", bat.EnergyFullDesign,
+			"cycle_count", bat.CycleCount,
+		)
+	}
 }
 
 // Len returns the number of batteries.

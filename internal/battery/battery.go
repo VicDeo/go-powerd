@@ -57,14 +57,14 @@ var (
 		keyStatus:           func(b *Battery, v []byte) error { b.Status = string(v); return nil },
 		keyPresent:          func(b *Battery, v []byte) error { b.Present = len(v) > 0 && v[0] == '1'; return nil },
 		keyTechnology:       func(b *Battery, v []byte) error { b.Technology = string(v); return nil },
-		keyCycleCount:       func(b *Battery, v []byte) error { return parseInt(v, &b.CycleCount) },
-		keyVoltageMinDesign: func(b *Battery, v []byte) error { return parseInt64(v, &b.VoltageMinDesign) },
-		keyVoltageNow:       func(b *Battery, v []byte) error { return parseInt64(v, &b.VoltageNow) },
-		keyPowerNow:         func(b *Battery, v []byte) error { return parseInt64(v, &b.PowerNow) },
-		keyEnergyFullDesign: func(b *Battery, v []byte) error { return parseInt64(v, &b.EnergyFullDesign) },
-		keyEnergyFull:       func(b *Battery, v []byte) error { return parseInt64(v, &b.EnergyFull) },
-		keyEnergyNow:        func(b *Battery, v []byte) error { return parseInt64(v, &b.EnergyNow) },
-		keyCapacity:         func(b *Battery, v []byte) error { return parseInt(v, &b.Capacity) },
+		keyCycleCount:       func(b *Battery, v []byte) error { return ParseTo(v, &b.CycleCount) },
+		keyVoltageMinDesign: func(b *Battery, v []byte) error { return ParseTo(v, &b.VoltageMinDesign) },
+		keyVoltageNow:       func(b *Battery, v []byte) error { return ParseTo(v, &b.VoltageNow) },
+		keyPowerNow:         func(b *Battery, v []byte) error { return ParseTo(v, &b.PowerNow) },
+		keyEnergyFullDesign: func(b *Battery, v []byte) error { return ParseTo(v, &b.EnergyFullDesign) },
+		keyEnergyFull:       func(b *Battery, v []byte) error { return ParseTo(v, &b.EnergyFull) },
+		keyEnergyNow:        func(b *Battery, v []byte) error { return ParseTo(v, &b.EnergyNow) },
+		keyCapacity:         func(b *Battery, v []byte) error { return ParseTo(v, &b.Capacity) },
 		keyCapacityLevel:    func(b *Battery, v []byte) error { b.CapacityLevel = string(v); return nil },
 		keyModelName:        func(b *Battery, v []byte) error { b.ModelName = string(v); return nil },
 		keyManufacturer:     func(b *Battery, v []byte) error { b.Manufacturer = string(v); return nil },
@@ -74,23 +74,23 @@ var (
 
 // Battery represents key battery parameters.
 type Battery struct {
-	Path             string // Path to the battery directory
-	Name             string // Battery name
-	ModelName        string // Battery model
-	Manufacturer     string // Battery vendor
-	Technology       string // Battery technology
-	SerialNumber     string // Battery serial
-	Status           string // Charging/Not charging/Discharging
-	CapacityLevel    string // Normal/Low
-	Capacity         int    // 0-100
-	VoltageMinDesign int64  // microvolts
-	VoltageNow       int64  // microvolts
-	EnergyNow        int64  // microwatt-hours
-	EnergyFull       int64  // microwatt-hours
-	EnergyFullDesign int64  // microwatt-hours
-	PowerNow         int64  // microwatts
-	CycleCount       int    // number of full charge-discharge cycles
-	Present          bool   // Whether the battery is attached right now
+	Path             string   // Path to the battery directory
+	Name             string   // Battery name
+	ModelName        string   // Battery model
+	Manufacturer     string   // Battery vendor
+	Technology       string   // Battery technology
+	SerialNumber     string   // Battery serial
+	Status           string   // Charging/Not charging/Discharging
+	CapacityLevel    string   // Normal/Low
+	Capacity         int      // 0-100
+	VoltageMinDesign Volt     // voltage by design
+	VoltageNow       Volt     // current voltage
+	EnergyNow        WattHour // current energy
+	EnergyFull       WattHour // energy when full
+	EnergyFullDesign WattHour // full energy by design
+	PowerNow         Watt     // current power consumption
+	CycleCount       int      // number of full charge-discharge cycles
+	Present          bool     // Whether the battery is attached right now
 }
 
 // New creates a new battery.
@@ -177,50 +177,10 @@ func (b *Battery) ExtendedStatus() string {
 	return extendedStatus
 }
 
-// parseInt is a universal helper for integers.
-func parseInt(raw []byte, target *int) error {
-	val, err := atoi64(raw)
-	if err != nil {
-		return err
-	}
-	*target = int(val) // Update the actual struct field
-	return nil
-}
-
-// parseInt64 is a universal helper for int64 (microunits).
-func parseInt64(raw []byte, target *int64) error {
-	val, err := atoi64(raw)
-	if err != nil {
-		return err
-	}
-	*target = val
-	return nil
-}
-
 // formatDuration is a helper to format seconds to the human readable format.
 func formatDuration(seconds float64) string {
 	hours := int64(seconds / 3600)
 	minutes := (int64(seconds) % 3600) / 60
 
 	return fmt.Sprintf("%dh %02dm", hours, minutes)
-}
-
-func atoi64(b []byte) (int64, error) {
-	var res int64
-	isNegative := false
-	for i := 0; i < len(b); i++ {
-		if i == 0 && b[i] == byte('-') {
-			isNegative = true
-			continue
-		}
-		if b[i] >= byte('0') && b[i] <= byte('9') {
-			res = res*10 + int64(b[i]-'0')
-		} else {
-			return 0, fmt.Errorf("ascii to int conversion failed. invalid source: %s", string(b))
-		}
-	}
-	if isNegative {
-		res = -res
-	}
-	return res, nil
 }

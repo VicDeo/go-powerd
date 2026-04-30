@@ -23,6 +23,8 @@ const (
 	sysfsPath = "/sys/class/power_supply"
 	// poll interval for the battery information
 	pollInterval = 60 * time.Second
+	// log battery metrics interval
+	logInterval = 10 * 60 * time.Second
 	// debounce window for the battery information
 	debounceWindow = 500 * time.Millisecond
 	// tray icon size in pixels
@@ -44,14 +46,16 @@ type App struct {
 	uiStateMu           sync.Mutex
 	icon                *icon.Icon
 	coordinator         *policy.Coordinator
+	lastLogTime         time.Time
 }
 
 // New creates a new App instance.
 func New(version string, cfg *config.Config) *App {
 	return &App{
-		batteries: battery.NewBatteries(sysfsPath),
-		config:    cfg,
-		version:   version,
+		batteries:   battery.NewBatteries(sysfsPath),
+		config:      cfg,
+		version:     version,
+		lastLogTime: time.Now().Add(-logInterval),
 	}
 }
 
@@ -150,6 +154,12 @@ func (a *App) updateUI() {
 		slog.Error("Error reading batteries info", "error", err)
 		return
 	}
+
+	if time.Since(a.lastLogTime) > logInterval {
+		a.lastLogTime = time.Now()
+		a.batteries.Log()
+	}
+
 	systray.SetTitle(a.batteries.Tooltip(a.version))
 	newState := uiState{capacity: a.batteries.Capacity(), isPluggedIn: a.batteries.IsPluggedIn()}
 	a.uiStateMu.Lock()
