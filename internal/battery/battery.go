@@ -13,8 +13,6 @@ import (
 )
 
 const (
-	keyDevType          = "DEVTYPE"           // Unused
-	keyType             = "POWER_SUPPLY_TYPE" // Unused
 	keyName             = "POWER_SUPPLY_NAME"
 	keyStatus           = "POWER_SUPPLY_STATUS"
 	keyPresent          = "POWER_SUPPLY_PRESENT"
@@ -50,9 +48,10 @@ const (
 )
 
 var (
+	keyDevType = []byte("DEVTYPE")
+	keyType    = []byte("POWER_SUPPLY_TYPE")
+
 	setters = map[string]func(*Battery, []byte) error{
-		keyType:             func(b *Battery, v []byte) error { /* unused */ return nil },
-		keyDevType:          func(b *Battery, v []byte) error { /* unused */ return nil },
 		keyName:             func(b *Battery, v []byte) error { b.Name = string(v); return nil },
 		keyStatus:           func(b *Battery, v []byte) error { b.Status = string(v); return nil },
 		keyPresent:          func(b *Battery, v []byte) error { b.Present = len(v) > 0 && v[0] == '1'; return nil },
@@ -130,9 +129,15 @@ func (b *Battery) Load() error {
 			continue
 		}
 
-		key, rawValue, ok := bytes.Cut(line, []byte("="))
-		if !ok {
+		idxEqual := bytes.IndexByte(line, '=')
+		if idxEqual == -1 {
 			slog.Debug("Line does not match key=value format", "line", string(line))
+			continue
+		}
+		key := line[:idxEqual]
+		rawValue := line[idxEqual+1:]
+
+		if bytes.Equal(key, keyDevType) || bytes.Equal(key, keyType) {
 			continue
 		}
 
