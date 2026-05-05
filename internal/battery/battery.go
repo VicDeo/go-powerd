@@ -182,6 +182,16 @@ func (b *Battery) ExtendedStatus() string {
 	return extendedStatus
 }
 
+func (b *Battery) Warnings() string {
+	if b.EnergyFull == 0 {
+		return fmt.Sprintf("Needs calibration: Max capacity unknown\nVoltage: %s, MinVoltage: %s",
+			b.VoltageNow.ToHuman(),
+			b.VoltageMinDesign.ToHuman(),
+		)
+	}
+	return ""
+}
+
 // formatDuration is a helper to format seconds to the human readable format.
 func formatDuration(seconds float64) string {
 	hours := int64(seconds / 3600)

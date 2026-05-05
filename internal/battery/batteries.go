@@ -142,12 +142,15 @@ func (b *Batteries) Tooltip(version string) string {
 		if err != nil {
 			slog.Warn("Error while getting battery health", "error", err)
 			fmt.Fprintf(&b.builder,
-				"\n%s [%s]\nPower: %d%%\nHealth: Unknown\n",
-				bat.Name, bat.ExtendedStatus(), bat.Capacity)
+				"\n%s [%s]\nPower: %d%%\nHealth: Unknown\n%s",
+				bat.Name, bat.ExtendedStatus(), bat.Capacity, bat.Warnings())
 		} else {
 			fmt.Fprintf(&b.builder,
-				"\n%s [%s]\nPower: %d%%\nHealth: %s (%d%%)\n",
-				bat.Name, bat.ExtendedStatus(), bat.Capacity, b.healthToString(health), health)
+				"\n%s [%s]\nPower: %d%%\nHealth: %s (%d%%)\n%s",
+				bat.Name, bat.ExtendedStatus(),
+				bat.Capacity, b.healthToString(health), health,
+				bat.Warnings(),
+			)
 		}
 	}
 	return b.builder.String()
@@ -159,7 +162,17 @@ func (b *Batteries) Capacity() int {
 		return 0
 	}
 	var totalEnergyFull, totalEnergyNow WattHour
+	var skippedBatteries []string
 	for _, bat := range b.batteries {
+		if bat.EnergyFull == 0 {
+			slog.Warn("Battery POWER_SUPPLY_ENERGY_FULL is zero",
+				"name", bat.Name,
+				"manufacturer", bat.Manufacturer,
+				"hint", "If this is a new battery, you might want to initialize it by performing a full charge/discharge cycle or a BIOS battery reset",
+			)
+			skippedBatteries = append(skippedBatteries, bat.Name)
+			continue
+		}
 		totalEnergyFull += bat.EnergyFull
 		totalEnergyNow += bat.EnergyNow
 	}
@@ -170,6 +183,18 @@ func (b *Batteries) Capacity() int {
 	}
 
 	capacity := (100 * totalEnergyNow / totalEnergyFull)
+
+	capacityByVoltage := 0
+	for _, bat := range skippedBatteries {
+		if b.lookup[bat].VoltageNow == 0 {
+			continue
+		}
+		capacityByVoltage += int(b.lookup[bat].VoltageMinDesign / b.lookup[bat].VoltageNow)
+	}
+	if capacityByVoltage > 0 {
+		capacity = (capacity + WattHour(capacityByVoltage)) / 2
+	}
+
 	return int(capacity)
 }
 
