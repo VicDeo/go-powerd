@@ -134,8 +134,8 @@ func (b *Battery) Load() error {
 			slog.Debug("Line does not match key=value format", "line", string(line))
 			continue
 		}
-		key := line[:idxEqual]
-		rawValue := line[idxEqual+1:]
+		key := bytes.TrimSpace(line[:idxEqual])
+		rawValue := bytes.TrimSpace(line[idxEqual+1:])
 
 		if bytes.Equal(key, keyDevType) || bytes.Equal(key, keyType) {
 			continue
