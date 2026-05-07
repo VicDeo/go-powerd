@@ -16,6 +16,12 @@ import (
 const (
 	// typeFilename is a name of the file that contains a device type.
 	typeFilename = "type"
+	// Typical nominal voltage of a single Li-ion cell
+	voltPerCell = 3_600_000
+	// Typical voltage of a single Li-ion cell when full
+	voltPerCellFull = 4_200_000
+	// Typical voltage of a single Li-ion cell when empty
+	voltPerCellEmpty = 3_000_000
 )
 
 var (
@@ -162,7 +168,7 @@ func (b *Batteries) Capacity() int {
 		return 0
 	}
 	var totalEnergyFull, totalEnergyNow WattHour
-	var skippedBatteries []string
+	var pctByVoltSum, skippedCount int
 	for _, bat := range b.batteries {
 		if bat.EnergyFull == 0 {
 			slog.Warn("Battery POWER_SUPPLY_ENERGY_FULL is zero",
@@ -170,32 +176,44 @@ func (b *Batteries) Capacity() int {
 				"manufacturer", bat.Manufacturer,
 				"hint", "If this is a new battery, you might want to initialize it by performing a full charge/discharge cycle or a BIOS battery reset",
 			)
-			skippedBatteries = append(skippedBatteries, bat.Name)
+			if bat.VoltageNow > 0 && bat.VoltageMinDesign > 0 {
+				// get number of cells
+				cells := int(bat.VoltageMinDesign / voltPerCell)
+				if cells < 1 {
+					continue
+				}
+				// normalize voltage per cell
+				voltageNowPerCell := bat.VoltageNow / Volt(cells)
+
+				pct := int(100 * (voltageNowPerCell - voltPerCellEmpty) / (voltPerCellFull - voltPerCellEmpty))
+
+				pct = max(0, pct)
+				pctByVoltSum += min(pct, 100)
+				skippedCount++
+			}
 			continue
 		}
 		totalEnergyFull += bat.EnergyFull
 		totalEnergyNow += bat.EnergyNow
 	}
 
-	if totalEnergyFull == 0 {
-		slog.Error("No energy full capacity available for aggregate", "totalEnergyFull", totalEnergyFull, "batteriesCount", len(b.lookup))
+	capacity := 0
+	if totalEnergyFull > 0 {
+		capacity = int(100 * totalEnergyNow / totalEnergyFull)
+	}
+
+	if skippedCount > 0 {
+		avgSkipped := pctByVoltSum / skippedCount
+		if totalEnergyFull > 0 {
+			capacity = (capacity + avgSkipped) / 2
+		} else {
+			capacity = avgSkipped
+		}
+	} else if totalEnergyFull == 0 {
 		return 0
 	}
 
-	capacity := (100 * totalEnergyNow / totalEnergyFull)
-
-	capacityByVoltage := 0
-	for _, bat := range skippedBatteries {
-		if b.lookup[bat].VoltageNow == 0 {
-			continue
-		}
-		capacityByVoltage += int(b.lookup[bat].VoltageMinDesign / b.lookup[bat].VoltageNow)
-	}
-	if capacityByVoltage > 0 {
-		capacity = (capacity + WattHour(capacityByVoltage)) / 2
-	}
-
-	return int(capacity)
+	return capacity
 }
 
 // IsPluggedIn returns true if the system is connected to AC power,
