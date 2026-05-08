@@ -25,3 +25,12 @@ func (c *Coordinator) HandleUpdate(capacity int, isPluggedIn bool) {
 		c.ActiveMngr.Update(capacity)
 	}
 }
+
+func (c *Coordinator) CopyStateTo(other *Coordinator) {
+	other.LastStatus = c.LastStatus
+	if c.LastStatus {
+		other.ActiveMngr = other.ChargingMngr
+	} else {
+		other.ActiveMngr = other.DischargingMngr
+	}
+}

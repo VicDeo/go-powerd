@@ -59,15 +59,24 @@ func main() {
 		os.Exit(1)
 	}
 
-	icn := icon.New(iconSize)
-	applyTheme(icn, cfg)
-	dischargingPolicies := parsePolicies(cfg)
-
-	a := app.New(version, icn, dischargingPolicies)
 	if tray {
+		icn := icon.New(iconSize)
+		applyTheme(icn, cfg)
+		dischargingPolicies := parsePolicies(cfg)
+		coordinator := initCoordinator(dischargingPolicies, nil)
+
+		a := app.New(version, icn, coordinator)
+
 		slog.Info("Starting go-powerd", "version", version, "commit", commit, "verbose", verbose)
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 		defer stop()
+
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, syscall.SIGHUP)
+		defer signal.Stop(sigChan)
+
+		go reloadListener(ctx, a, coordinator, icn, sigChan, configPath)
+
 		if err := a.Run(ctx); err != nil {
 			slog.Error("Error starting the application", "error", err)
 			slog.Info("Shutting down go-powerd", "version", version)
@@ -75,6 +84,7 @@ func main() {
 		}
 		slog.Info("Shutting down go-powerd", "version", version)
 	} else {
+		a := app.New(version, nil, nil)
 		status, err := a.Status()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error while getting battery status: %v", err)
@@ -122,6 +132,49 @@ func parsePolicies(cfg *config.Config) []*policy.Policy {
 		dischargingPolicies = append(dischargingPolicies, &criticalPolicy)
 	}
 	return dischargingPolicies
+}
+
+func initCoordinator(dischargingPolicies, chargingPolicies []*policy.Policy) *policy.Coordinator {
+	discharging := &policy.Manager{
+		Name:     "On Battery",
+		Policies: dischargingPolicies,
+	}
+
+	charging := &policy.Manager{
+		Name:     "Charging",
+		Policies: chargingPolicies,
+	}
+
+	return &policy.Coordinator{
+		ChargingMngr:    charging,
+		DischargingMngr: discharging,
+		ActiveMngr:      nil,
+		LastStatus:      true,
+	}
+}
+
+func reloadListener(ctx context.Context, a *app.App, coordinator *policy.Coordinator, icn *icon.Icon, sigChan <-chan os.Signal, configPath string) {
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case sig := <-sigChan:
+			if sig == syscall.SIGHUP {
+				cfg, err := config.Load(configPath)
+				if err != nil {
+					slog.Error("Error reloading config", "error", err)
+					continue
+				}
+				applyTheme(icn, cfg)
+
+				dischargingPolicies := parsePolicies(cfg)
+				next := initCoordinator(dischargingPolicies, nil)
+				coordinator.CopyStateTo(next)
+				a.Reload(next)
+				coordinator = next
+			}
+		}
+	}
 }
 
 func help() {

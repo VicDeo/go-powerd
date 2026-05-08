@@ -12,7 +12,6 @@ import (
 	"github.com/VicDeo/go-powerd/internal/battery"
 	"github.com/VicDeo/go-powerd/internal/debounce"
 	"github.com/VicDeo/go-powerd/internal/netlink"
-	"github.com/VicDeo/go-powerd/internal/policy"
 	"github.com/energye/systray"
 )
 
@@ -34,24 +33,26 @@ type uiState struct {
 
 // App is the main application struct.
 type App struct {
-	batteries           *battery.Batteries
-	dischargingPolicies []*policy.Policy
-	version             string
-	uiState             uiState
-	uiStateMu           sync.Mutex
-	icon                iconGetter
-	coordinator         *policy.Coordinator
-	lastLogTime         time.Time
+	batteries     *battery.Batteries
+	version       string
+	uiState       uiState
+	uiStateMu     sync.Mutex
+	icon          iconGetter
+	coordinator   actionTrigger
+	coordinatorMu sync.Mutex
+	deb           *debounce.Debouncer
+	debMu         sync.Mutex
+	lastLogTime   time.Time
 }
 
 // New creates a new App instance.
-func New(version string, icon iconGetter, dischargingPolicies []*policy.Policy) *App {
+func New(version string, icon iconGetter, coordinator actionTrigger) *App {
 	return &App{
-		batteries:           battery.NewBatteries(sysfsPath),
-		icon:                icon,
-		dischargingPolicies: dischargingPolicies,
-		version:             version,
-		lastLogTime:         time.Now().Add(-logInterval),
+		batteries:   battery.NewBatteries(sysfsPath),
+		icon:        icon,
+		coordinator: coordinator,
+		version:     version,
+		lastLogTime: time.Now().Add(-logInterval),
 	}
 }
 
@@ -71,7 +72,6 @@ func (a *App) Run(ctx context.Context) error {
 	}
 
 	a.uiState = uiState{capacity: -1, isPluggedIn: false}
-	a.coordinator = a.initCoordinator()
 
 	runCtx, cancel := context.WithCancel(ctx)
 	systray.Run(
@@ -99,6 +99,9 @@ func (a *App) onReady(ctx context.Context, cancel context.CancelFunc) {
 
 	deb := debounce.New(debounceWindow, a.updateUI)
 	defer deb.Stop()
+	a.debMu.Lock()
+	a.deb = deb
+	a.debMu.Unlock()
 
 	onPowerEvent := func([]byte) {
 		deb.Trigger()
@@ -127,17 +130,20 @@ func (a *App) onReady(ctx context.Context, cancel context.CancelFunc) {
 	a.setupMenu(cancel)
 }
 
-func (a *App) initCoordinator() *policy.Coordinator {
-	discharging := &policy.Manager{
-		Name:     "On Battery",
-		Policies: a.dischargingPolicies,
-	}
+func (a *App) Reload(coordinator actionTrigger) {
+	a.coordinatorMu.Lock()
+	a.coordinator = coordinator
+	a.coordinatorMu.Unlock()
 
-	return &policy.Coordinator{
-		ChargingMngr:    &policy.Manager{Name: "Charging"},
-		DischargingMngr: discharging,
-		ActiveMngr:      nil,
-		LastStatus:      true,
+	a.uiStateMu.Lock()
+	// Force redraw icon
+	a.uiState = uiState{capacity: -1, isPluggedIn: false}
+	a.uiStateMu.Unlock()
+	a.debMu.Lock()
+	deb := a.deb
+	a.debMu.Unlock()
+	if deb != nil {
+		deb.Trigger()
 	}
 }
 
@@ -158,7 +164,13 @@ func (a *App) updateUI() {
 	a.uiStateMu.Lock()
 	defer a.uiStateMu.Unlock()
 	if a.uiState.capacity != newState.capacity || a.uiState.isPluggedIn != newState.isPluggedIn {
-		a.coordinator.HandleUpdate(newState.capacity, newState.isPluggedIn)
+		a.coordinatorMu.Lock()
+		c := a.coordinator
+		a.coordinatorMu.Unlock()
+		if c != nil {
+			c.HandleUpdate(newState.capacity, newState.isPluggedIn)
+		}
+
 		appIcon, fromCache := a.icon.Get(newState.capacity, newState.isPluggedIn)
 		a.uiState.capacity = newState.capacity
 		a.uiState.isPluggedIn = newState.isPluggedIn
