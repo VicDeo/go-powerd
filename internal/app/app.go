@@ -10,9 +10,7 @@ import (
 	"time"
 
 	"github.com/VicDeo/go-powerd/internal/battery"
-	"github.com/VicDeo/go-powerd/internal/config"
 	"github.com/VicDeo/go-powerd/internal/debounce"
-	"github.com/VicDeo/go-powerd/internal/icon"
 	"github.com/VicDeo/go-powerd/internal/netlink"
 	"github.com/VicDeo/go-powerd/internal/policy"
 	"github.com/energye/systray"
@@ -27,8 +25,6 @@ const (
 	logInterval = 10 * 60 * time.Second
 	// debounce window for the battery information
 	debounceWindow = 500 * time.Millisecond
-	// tray icon size in pixels
-	iconSize = 32.0
 )
 
 type uiState struct {
@@ -38,24 +34,24 @@ type uiState struct {
 
 // App is the main application struct.
 type App struct {
-	config              *config.Config
 	batteries           *battery.Batteries
 	dischargingPolicies []*policy.Policy
 	version             string
 	uiState             uiState
 	uiStateMu           sync.Mutex
-	icon                *icon.Icon
+	icon                iconGetter
 	coordinator         *policy.Coordinator
 	lastLogTime         time.Time
 }
 
 // New creates a new App instance.
-func New(version string, cfg *config.Config) *App {
+func New(version string, icon iconGetter, dischargingPolicies []*policy.Policy) *App {
 	return &App{
-		batteries:   battery.NewBatteries(sysfsPath),
-		config:      cfg,
-		version:     version,
-		lastLogTime: time.Now().Add(-logInterval),
+		batteries:           battery.NewBatteries(sysfsPath),
+		icon:                icon,
+		dischargingPolicies: dischargingPolicies,
+		version:             version,
+		lastLogTime:         time.Now().Add(-logInterval),
 	}
 }
 
@@ -74,11 +70,8 @@ func (a *App) Run(ctx context.Context) error {
 		return fmt.Errorf("no batteries with capacity found")
 	}
 
-	a.parseConfig()
 	a.uiState = uiState{capacity: -1, isPluggedIn: false}
 	a.coordinator = a.initCoordinator()
-	a.icon = icon.New(iconSize)
-	a.icon.SetColors(&a.config.Theme.Colors)
 
 	runCtx, cancel := context.WithCancel(ctx)
 	systray.Run(
@@ -183,26 +176,4 @@ func (a *App) setupMenu(cancel context.CancelFunc) {
 		cancel()
 		systray.Quit()
 	})
-}
-
-func (a *App) parseConfig() {
-	if a.config.Policies.Notify.Active {
-		lowPolicy := policy.Policy{
-			Name:       "Low",
-			Threshold:  a.config.Policies.Notify.Threshold,
-			Hysteresis: a.config.Policies.Notify.Hysteresis,
-			OnTrigger:  sendNotification,
-		}
-		a.dischargingPolicies = append(a.dischargingPolicies, &lowPolicy)
-	}
-
-	if a.config.Policies.Suspend.Active {
-		criticalPolicy := policy.Policy{
-			Name:       "Critical",
-			Threshold:  a.config.Policies.Suspend.Threshold,
-			Hysteresis: a.config.Policies.Suspend.Hysteresis,
-			OnTrigger:  sendSuspendSystem,
-		}
-		a.dischargingPolicies = append(a.dischargingPolicies, &criticalPolicy)
-	}
 }

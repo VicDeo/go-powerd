@@ -12,6 +12,13 @@ import (
 
 	"github.com/VicDeo/go-powerd/internal/app"
 	"github.com/VicDeo/go-powerd/internal/config"
+	"github.com/VicDeo/go-powerd/internal/icon"
+	"github.com/VicDeo/go-powerd/internal/policy"
+)
+
+const (
+	// tray icon size in pixels
+	iconSize = 32.0
 )
 
 var (
@@ -52,7 +59,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	a := app.New(version, cfg)
+	icn := icon.New(iconSize)
+	applyTheme(icn, cfg)
+	dischargingPolicies := parsePolicies(cfg)
+
+	a := app.New(version, icn, dischargingPolicies)
 	if tray {
 		slog.Info("Starting go-powerd", "version", version, "commit", commit, "verbose", verbose)
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -82,6 +93,35 @@ func setupLogger(verbose bool) {
 	h := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: logLevel, AddSource: verbose})
 	logger := slog.New(h)
 	slog.SetDefault(logger)
+}
+
+func applyTheme(icn *icon.Icon, cfg *config.Config) {
+	icn.SetColors(&cfg.Theme.Colors)
+	icn.Reset()
+}
+
+func parsePolicies(cfg *config.Config) []*policy.Policy {
+	dischargingPolicies := make([]*policy.Policy, 0)
+	if cfg.Policies.Notify.Active {
+		lowPolicy := policy.Policy{
+			Name:       "Low",
+			Threshold:  cfg.Policies.Notify.Threshold,
+			Hysteresis: cfg.Policies.Notify.Hysteresis,
+			OnTrigger:  sendNotification,
+		}
+		dischargingPolicies = append(dischargingPolicies, &lowPolicy)
+	}
+
+	if cfg.Policies.Suspend.Active {
+		criticalPolicy := policy.Policy{
+			Name:       "Critical",
+			Threshold:  cfg.Policies.Suspend.Threshold,
+			Hysteresis: cfg.Policies.Suspend.Hysteresis,
+			OnTrigger:  sendSuspendSystem,
+		}
+		dischargingPolicies = append(dischargingPolicies, &criticalPolicy)
+	}
+	return dischargingPolicies
 }
 
 func help() {
