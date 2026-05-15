@@ -100,23 +100,14 @@ func (a *App) onReady(ctx context.Context, cancel context.CancelFunc) {
 	go func() {
 		if err := a.watcher.Watch(ctx, a.deb.Trigger); err != nil {
 			cancel()
-			slog.Error("Failed to start kernel event watcher", "error", err)
+			if err != context.Canceled {
+				slog.Error("Failed to start kernel event watcher", "error", err)
+			}
 			systray.Quit()
 		}
 	}()
 
-	go func() {
-		ticker := time.NewTicker(pollInterval)
-		defer ticker.Stop()
-		for {
-			select {
-			case <-ctx.Done():
-				return
-			case <-ticker.C:
-				a.deb.Trigger()
-			}
-		}
-	}()
+	go a.startPoller(ctx)
 
 	a.setupMenu(cancel)
 }
@@ -168,6 +159,19 @@ func (a *App) updateUI() {
 		systray.SetIcon(appIcon)
 		if !fromCache {
 			debug.FreeOSMemory()
+		}
+	}
+}
+
+func (a *App) startPoller(ctx context.Context) {
+	ticker := time.NewTicker(pollInterval)
+	defer ticker.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-ticker.C:
+			a.deb.Trigger()
 		}
 	}
 }
