@@ -9,7 +9,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/VicDeo/go-powerd/internal/netlink"
 	"github.com/energye/systray"
 )
 
@@ -36,17 +35,19 @@ type App struct {
 	coordinatorMu sync.Mutex
 	deb           debouncer
 	debMu         sync.Mutex
+	watcher       eventWatcher
 	lastLogTime   time.Time
 }
 
 // New creates a new App instance.
-func New(version string, bats statusProvider, icon iconGetter, coordinator actionTrigger, deb debouncer) *App {
+func New(version string, bats statusProvider, icon iconGetter, coordinator actionTrigger, deb debouncer, w eventWatcher) *App {
 	return &App{
 		batteries:   bats,
 		version:     version,
 		icon:        icon,
 		coordinator: coordinator,
 		deb:         deb,
+		watcher:     w,
 		lastLogTime: time.Now().Add(-logInterval),
 	}
 }
@@ -96,13 +97,10 @@ func (a *App) onReady(ctx context.Context, cancel context.CancelFunc) {
 	a.deb.Start(a.updateUI)
 	a.debMu.Unlock()
 
-	onPowerEvent := func([]byte) {
-		a.deb.Trigger()
-	}
 	go func() {
-		if err := netlink.Listen(ctx, onPowerEvent); err != nil {
+		if err := a.watcher.Watch(ctx, a.deb.Trigger); err != nil {
 			cancel()
-			slog.Error("Error establishing kernel socket connection", "error", err)
+			slog.Error("Failed to start kernel event watcher", "error", err)
 			systray.Quit()
 		}
 	}()

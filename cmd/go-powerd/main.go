@@ -16,6 +16,7 @@ import (
 	"github.com/VicDeo/go-powerd/internal/config"
 	"github.com/VicDeo/go-powerd/internal/debounce"
 	"github.com/VicDeo/go-powerd/internal/icon"
+	"github.com/VicDeo/go-powerd/internal/netlink"
 	"github.com/VicDeo/go-powerd/internal/policy"
 )
 
@@ -79,7 +80,9 @@ func main() {
 		deb := debounce.New(debounceWindow)
 		defer deb.Stop()
 
-		a := app.New(version, bats, icn, coordinator, deb)
+		watcher := &netlink.Listener{}
+
+		a := app.New(version, bats, icn, coordinator, deb, watcher)
 
 		slog.Info("Starting go-powerd", "version", version, "commit", commit, "verbose", verbose)
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -98,7 +101,7 @@ func main() {
 		}
 		slog.Info("Shutting down go-powerd", "version", version)
 	} else {
-		a := app.New(version, bats, nil, nil, nil)
+		a := app.New(version, bats, nil, nil, nil, nil)
 		status, err := a.Status()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error while getting battery status: %v", err)

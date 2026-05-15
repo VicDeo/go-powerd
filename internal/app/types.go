@@ -1,5 +1,7 @@
 package app
 
+import "context"
+
 type iconGetter interface {
 	Get(percent int, charging bool) (icon []byte, fromCache bool)
 }
@@ -20,4 +22,8 @@ type statusProvider interface {
 	Capacity() int
 	Tooltip(string) string
 	Log()
+}
+
+type eventWatcher interface {
+	Watch(context.Context, func()) error
 }

@@ -20,6 +20,19 @@ var (
 	}
 )
 
+type Listener struct{}
+
+// Watch listens for the kernel event in the loop
+func (l *Listener) Watch(ctx context.Context, onEvent func()) error {
+	onPowerEvent := func([]byte) {
+		onEvent()
+	}
+	if err := Listen(ctx, onPowerEvent); err != nil {
+		return err
+	}
+	return nil
+}
+
 // Listen subscribes to the kernel events and executes a callback on power events only.
 func Listen(ctx context.Context, onEvent func(data []byte)) error {
 	fd, err := unix.Socket(
