@@ -9,14 +9,11 @@ import (
 	"sync"
 	"time"
 
-	"github.com/VicDeo/go-powerd/internal/battery"
 	"github.com/VicDeo/go-powerd/internal/netlink"
 	"github.com/energye/systray"
 )
 
 const (
-	// sysfs path to the battery information
-	sysfsPath = "/sys/class/power_supply"
 	// poll interval for the battery information
 	pollInterval = 60 * time.Second
 	// log battery metrics interval
@@ -30,7 +27,7 @@ type uiState struct {
 
 // App is the main application struct.
 type App struct {
-	batteries     *battery.Batteries
+	batteries     statusProvider
 	version       string
 	uiState       uiState
 	uiStateMu     sync.Mutex
@@ -43,9 +40,9 @@ type App struct {
 }
 
 // New creates a new App instance.
-func New(version string, icon iconGetter, coordinator actionTrigger, deb debouncer) *App {
+func New(version string, bats statusProvider, icon iconGetter, coordinator actionTrigger, deb debouncer) *App {
 	return &App{
-		batteries:   battery.NewBatteries(sysfsPath),
+		batteries:   bats,
 		version:     version,
 		icon:        icon,
 		coordinator: coordinator,

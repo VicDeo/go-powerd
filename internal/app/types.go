@@ -12,3 +12,12 @@ type debouncer interface {
 	Start(func())
 	Trigger()
 }
+
+type statusProvider interface {
+	Load() error
+	Len() int
+	IsPluggedIn() bool
+	Capacity() int
+	Tooltip(string) string
+	Log()
+}

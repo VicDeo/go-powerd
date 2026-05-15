@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/VicDeo/go-powerd/internal/app"
+	"github.com/VicDeo/go-powerd/internal/battery"
 	"github.com/VicDeo/go-powerd/internal/config"
 	"github.com/VicDeo/go-powerd/internal/debounce"
 	"github.com/VicDeo/go-powerd/internal/icon"
@@ -19,6 +20,9 @@ import (
 )
 
 const (
+	// sysfs path to the battery information
+	sysfsPath = "/sys/class/power_supply"
+
 	// debounce window for the battery information
 	debounceWindow = 500 * time.Millisecond
 
@@ -64,6 +68,8 @@ func main() {
 		os.Exit(1)
 	}
 
+	bats := battery.NewBatteries(sysfsPath)
+
 	if tray {
 		icn := icon.New(iconSize)
 		applyTheme(icn, cfg)
@@ -73,7 +79,7 @@ func main() {
 		deb := debounce.New(debounceWindow)
 		defer deb.Stop()
 
-		a := app.New(version, icn, coordinator, deb)
+		a := app.New(version, bats, icn, coordinator, deb)
 
 		slog.Info("Starting go-powerd", "version", version, "commit", commit, "verbose", verbose)
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -92,7 +98,7 @@ func main() {
 		}
 		slog.Info("Shutting down go-powerd", "version", version)
 	} else {
-		a := app.New(version, nil, nil, nil)
+		a := app.New(version, bats, nil, nil, nil)
 		status, err := a.Status()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error while getting battery status: %v", err)
