@@ -9,14 +9,19 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	"github.com/VicDeo/go-powerd/internal/app"
 	"github.com/VicDeo/go-powerd/internal/config"
+	"github.com/VicDeo/go-powerd/internal/debounce"
 	"github.com/VicDeo/go-powerd/internal/icon"
 	"github.com/VicDeo/go-powerd/internal/policy"
 )
 
 const (
+	// debounce window for the battery information
+	debounceWindow = 500 * time.Millisecond
+
 	// tray icon size in pixels
 	iconSize = 32.0
 )
@@ -65,7 +70,10 @@ func main() {
 		dischargingPolicies := parsePolicies(cfg)
 		coordinator := initCoordinator(dischargingPolicies, nil)
 
-		a := app.New(version, icn, coordinator)
+		deb := debounce.New(debounceWindow)
+		defer deb.Stop()
+
+		a := app.New(version, icn, coordinator, deb)
 
 		slog.Info("Starting go-powerd", "version", version, "commit", commit, "verbose", verbose)
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -84,7 +92,7 @@ func main() {
 		}
 		slog.Info("Shutting down go-powerd", "version", version)
 	} else {
-		a := app.New(version, nil, nil)
+		a := app.New(version, nil, nil, nil)
 		status, err := a.Status()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "Error while getting battery status: %v", err)

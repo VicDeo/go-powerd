@@ -7,3 +7,8 @@ type iconGetter interface {
 type actionTrigger interface {
 	HandleUpdate(capacity int, isPluggedIn bool)
 }
+
+type debouncer interface {
+	Start(func())
+	Trigger()
+}

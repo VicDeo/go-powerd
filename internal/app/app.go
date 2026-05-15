@@ -10,7 +10,6 @@ import (
 	"time"
 
 	"github.com/VicDeo/go-powerd/internal/battery"
-	"github.com/VicDeo/go-powerd/internal/debounce"
 	"github.com/VicDeo/go-powerd/internal/netlink"
 	"github.com/energye/systray"
 )
@@ -22,8 +21,6 @@ const (
 	pollInterval = 60 * time.Second
 	// log battery metrics interval
 	logInterval = 10 * 60 * time.Second
-	// debounce window for the battery information
-	debounceWindow = 500 * time.Millisecond
 )
 
 type uiState struct {
@@ -40,18 +37,19 @@ type App struct {
 	icon          iconGetter
 	coordinator   actionTrigger
 	coordinatorMu sync.Mutex
-	deb           *debounce.Debouncer
+	deb           debouncer
 	debMu         sync.Mutex
 	lastLogTime   time.Time
 }
 
 // New creates a new App instance.
-func New(version string, icon iconGetter, coordinator actionTrigger) *App {
+func New(version string, icon iconGetter, coordinator actionTrigger, deb debouncer) *App {
 	return &App{
 		batteries:   battery.NewBatteries(sysfsPath),
+		version:     version,
 		icon:        icon,
 		coordinator: coordinator,
-		version:     version,
+		deb:         deb,
 		lastLogTime: time.Now().Add(-logInterval),
 	}
 }
@@ -97,14 +95,12 @@ func (a *App) onExit() {
 func (a *App) onReady(ctx context.Context, cancel context.CancelFunc) {
 	a.updateUI()
 
-	deb := debounce.New(debounceWindow, a.updateUI)
-	defer deb.Stop()
 	a.debMu.Lock()
-	a.deb = deb
+	a.deb.Start(a.updateUI)
 	a.debMu.Unlock()
 
 	onPowerEvent := func([]byte) {
-		deb.Trigger()
+		a.deb.Trigger()
 	}
 	go func() {
 		if err := netlink.Listen(ctx, onPowerEvent); err != nil {
@@ -122,7 +118,7 @@ func (a *App) onReady(ctx context.Context, cancel context.CancelFunc) {
 			case <-ctx.Done():
 				return
 			case <-ticker.C:
-				deb.Trigger()
+				a.deb.Trigger()
 			}
 		}
 	}()
@@ -143,7 +139,7 @@ func (a *App) Reload(coordinator actionTrigger) {
 	deb := a.deb
 	a.debMu.Unlock()
 	if deb != nil {
-		deb.Trigger()
+		a.deb.Trigger()
 	}
 }
 

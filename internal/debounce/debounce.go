@@ -16,14 +16,24 @@ type Debouncer struct {
 }
 
 // New returns a debouncer that calls fn after interval of no triggers.
-func New(interval time.Duration, fn func()) *Debouncer {
-	return &Debouncer{interval: interval, fn: fn}
+func New(interval time.Duration) *Debouncer {
+	return &Debouncer{interval: interval}
+}
+
+// Start initializes debouncer with a callback function.
+func (d *Debouncer) Start(fn func()) {
+	d.mu.Lock()
+	defer d.mu.Unlock()
+	d.fn = fn
 }
 
 // Trigger schedules or resets the debounced call.
 func (d *Debouncer) Trigger() {
 	d.mu.Lock()
 	defer d.mu.Unlock()
+	if d.fn == nil {
+		return
+	}
 
 	if d.timer != nil {
 		d.timer.Stop()
