@@ -13,6 +13,7 @@ type actionTrigger interface {
 type debouncer interface {
 	Start(func())
 	Trigger()
+	TriggerForce()
 }
 
 type statusProvider interface {

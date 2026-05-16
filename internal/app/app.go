@@ -91,11 +91,11 @@ func (a *App) onExit() {
 
 // onReady is the callback function for the systray.
 func (a *App) onReady(ctx context.Context, cancel context.CancelFunc) {
-	a.updateUI()
-
 	a.debMu.Lock()
 	a.deb.Start(a.updateUI)
 	a.debMu.Unlock()
+
+	a.deb.TriggerForce()
 
 	go func() {
 		if err := a.watcher.Watch(ctx, a.deb.Trigger); err != nil {
@@ -121,11 +121,12 @@ func (a *App) Reload(coordinator actionTrigger) {
 	// Force redraw icon
 	a.uiState = uiState{capacity: -1, isPluggedIn: false}
 	a.uiStateMu.Unlock()
+
 	a.debMu.Lock()
 	deb := a.deb
 	a.debMu.Unlock()
 	if deb != nil {
-		a.deb.Trigger()
+		deb.TriggerForce()
 	}
 }
 

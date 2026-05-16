@@ -41,6 +41,17 @@ func (d *Debouncer) Trigger() {
 	d.timer = time.AfterFunc(d.interval, d.run)
 }
 
+// TriggerForce cancels timer and executes callback immediately.
+func (d *Debouncer) TriggerForce() {
+	d.mu.Lock()
+	if d.timer != nil {
+		d.timer.Stop()
+	}
+	d.mu.Unlock()
+
+	d.fn()
+}
+
 // run is a helper to run the debounced callback.
 func (d *Debouncer) run() {
 	d.mu.Lock()
